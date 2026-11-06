@@ -45,7 +45,9 @@ def test_http_with_postgres(postgres_service: DocumentRAGService) -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["citations"][0]["source"] == "matching-engine.md"
+    body = response.json()
+    assert not body["refused"], body
+    assert body["citations"][0]["source"] == "matching-engine.md"
 
 
 @pytest.mark.anyio
