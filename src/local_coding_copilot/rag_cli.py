@@ -17,6 +17,7 @@ def main() -> int:
     query = commands.add_parser("query")
     query.add_argument("question")
     query.add_argument("--limit", type=int, default=5)
+    query.add_argument("--mode", choices=("fast", "grounded"), default="grounded")
 
     args = parser.parse_args()
     service = build_rag_service()
@@ -29,7 +30,7 @@ def main() -> int:
         print(f"Indexed {len(documents)} documents")
         return 0
 
-    response = service.query(args.question, args.limit)
+    response = service.query(args.question, args.limit, args.mode)
     print(json.dumps(asdict(response), ensure_ascii=False, indent=2))
     return 0
 

@@ -42,3 +42,8 @@ jobs:
       - run: pytest
       - run: python -m local_coding_copilot.rag_cli ingest data/synthetic
       - run: python -m local_coding_copilot.smoke
+      - run: python -m local_coding_copilot.evaluate
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m3-evaluation-${{ matrix.python-version }}
+          path: data/runtime/m3-evaluation.json

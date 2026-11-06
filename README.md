@@ -2,7 +2,7 @@
 
 Локальный coding-ассистент с доказательными ответами, RAG по исходному коду, tool calling и изолированным выполнением тестов.
 
-**Статус:** реализован document RAG baseline на PostgreSQL/pgvector с hybrid retrieval, citations, HTTP и MCP. Пока используются fake embeddings/LLM; авторизация, code RAG, sandbox и реальные модели ещё не реализованы.
+**Статус:** document RAG поддерживает fast/grounded режимы, проверку citations и явный отказ. Добавлены 30 golden-кейсов и baseline/RAG evaluation. Пока используются fake embeddings/LLM; авторизация, code RAG, sandbox и реальные модели ещё не реализованы.
 
 ## Цель
 
@@ -51,6 +51,7 @@ docker compose up -d db
 export DATABASE_URL=postgresql://copilot:copilot@127.0.0.1:5432/copilot
 python -m local_coding_copilot.rag_cli ingest data/synthetic
 python -m local_coding_copilot.smoke
+python -m local_coding_copilot.evaluate
 python -m local_coding_copilot.rag_cli query "What is the maximum order notional?"
 ```
 

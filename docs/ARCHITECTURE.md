@@ -56,13 +56,15 @@ Project ACL, repository, symbol и commit metadata будут добавлены
 
 ### Orchestrator
 
-Начальная реализация — явная конечная state machine без дополнительного agent framework.
+Document query реализован без дополнительного agent framework.
 
 Режимы:
 
-- `fast` — основной agent без необязательных вызовов;
-- `grounded` — расширенные проверки и critic;
-- `eval` — воспроизводимые параметры и сохранение результатов.
+- `fast` — retrieval и один LLM-вызов без обязательной citation validation;
+- `grounded` — relevance filtering, обязательные существующие citations и проверка числовых утверждений по процитированному тексту;
+- `eval` — отдельный runner с фиксированным dataset, fake provider и сохранением результатов.
+
+Оба режима отказывают при отсутствии релевантных источников. Grounding-проверки не доказывают смысловую истинность каждого утверждения и не являются security boundary. LLM-judge используется только в отдельной calibration harness, не в production answer path.
 
 Coding workflow ограничен числом итераций и не может самостоятельно выполнить merge.
 

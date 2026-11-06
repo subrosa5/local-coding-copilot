@@ -50,5 +50,5 @@ def rag_service() -> DocumentRAGService:
     return DocumentRAGService(
         repository=InMemoryDocumentRepository(),
         embeddings=FakeEmbeddingProvider(),
-        llm=FakeLLMProvider(response="Grounded fake answer"),
+        llm=FakeLLMProvider(response="Grounded fake answer", cite_sources=True),
     )

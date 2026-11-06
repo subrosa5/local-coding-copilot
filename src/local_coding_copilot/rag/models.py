@@ -1,4 +1,7 @@
 from dataclasses import dataclass
+from typing import Literal
+
+AnswerMode = Literal["fast", "grounded"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +50,7 @@ class RetrievalTraceItem:
     score: float
     vector_score: float
     lexical_score: float
+    selected: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,3 +58,6 @@ class QueryResponse:
     answer: str
     citations: tuple[Citation, ...]
     retrieval: tuple[RetrievalTraceItem, ...]
+    mode: AnswerMode
+    refused: bool
+    refusal_reason: str | None = None
