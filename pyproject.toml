@@ -8,10 +8,16 @@ version = "0.1.0"
 description = "Local-first coding copilot with grounded RAG and sandboxed execution"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fastapi==0.162.0",
+    "mcp==2.3.0",
+    "psycopg[binary]==3.3.8",
+    "uvicorn==0.54.0",
+]
 
 [project.optional-dependencies]
 dev = [
+    "httpx==0.28.1",
     "pytest==8.4.2",
     "ruff==0.14.5",
 ]

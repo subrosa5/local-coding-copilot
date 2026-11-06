@@ -26,37 +26,33 @@ HTTP client / MCP client / IDE
 
 ### API и MCP
 
-Оба транспорта вызывают один application service. Они не содержат отдельных реализаций retrieval, авторизации или orchestration.
+FastAPI HTTP и MCP stdio вызывают один `DocumentRAGService`. Они не содержат отдельных реализаций retrieval или orchestration. Авторизация будет добавлена в M4; текущие транспорты предназначены только для локальных синтетических данных.
 
 ### Provider interfaces
 
 В `src/local_coding_copilot/providers/contracts.py` определены независимые контракты:
 
 - `LLMProvider` — chat/tool calling; адаптеры внешнего или OpenAI-compatible local endpoint ещё предстоит реализовать;
-- `EmbeddingProvider` — локальные embeddings;
-- `RerankerProvider` — локальный reranking;
+- `EmbeddingProvider` — embeddings;
+- `RerankerProvider` — reranking;
 - fake implementations — детерминированные CI-тесты без внешних API.
 
 POC не должен зависеть от конкретного облачного провайдера.
 
 ### Retrieval
 
-Для кода и документов используются:
+Document RAG использует PostgreSQL full-text и pgvector candidates, объединённые через Reciprocal Rank Fusion. Повторная индексация атомарно заменяет документ и его chunks. Ответ содержит `source:start_line-end_line@version` и retrieval trace со vector/lexical scores.
 
-- точный поиск через `ripgrep` или эквивалентный code-search инструмент;
-- Tree-sitter для границ функций, классов и методов;
-- PostgreSQL/pgvector для embeddings и метаданных;
-- BM25/full-text и vector candidates;
-- объединение кандидатов и опциональный reranking.
+Для code RAG в M5 дополнительно планируются `ripgrep`, Tree-sitter, AST metadata и commit-aware citations. Reranker provider пока не подключён к document pipeline.
 
-Каждая запись содержит как минимум:
+Текущая document-запись содержит:
 
 ```text
-tenant/project/repository/path/symbol/language
-branch/commit_sha/acl/content_hash
+document_id/source/version/chunk_id
+start_line/end_line/content/embedding
 ```
 
-ACL применяется до поиска. Ответ содержит `path:line@commit_sha` либо стабильную ссылку на документ и его версию.
+Project ACL, repository, symbol и commit metadata будут добавлены вместе с соответствующими этапами.
 
 ### Orchestrator
 

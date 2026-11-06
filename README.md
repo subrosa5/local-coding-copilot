@@ -2,7 +2,7 @@
 
 Локальный coding-ассистент с доказательными ответами, RAG по исходному коду, tool calling и изолированным выполнением тестов.
 
-**Статус:** реализован минимальный Python-каркас с provider contracts и fake implementations. RAG, HTTP/MCP, БД, sandbox и реальные модели ещё не реализованы; код из предыдущего проекта не переносился.
+**Статус:** реализован document RAG baseline на PostgreSQL/pgvector с hybrid retrieval, citations, HTTP и MCP. Пока используются fake embeddings/LLM; авторизация, code RAG, sandbox и реальные модели ещё не реализованы.
 
 ## Цель
 
@@ -41,16 +41,20 @@
 
 ## Быстрый запуск
 
-Текущий CLI проверяет только сквозной вызов fake LLM и не является демо RAG:
+Нужны Python 3.11+ и Docker Compose:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
-python -m local_coding_copilot "Hello"
+docker compose up -d db
+export DATABASE_URL=postgresql://copilot:copilot@127.0.0.1:5432/copilot
+python -m local_coding_copilot.rag_cli ingest data/synthetic
+python -m local_coding_copilot.smoke
+python -m local_coding_copilot.rag_cli query "What is the maximum order notional?"
 ```
 
-Ожидаемый вывод: `Fake provider response.`
+HTTP: `python -m local_coding_copilot.api`. MCP stdio: `python -m local_coding_copilot.mcp_server`. Подробности в [runbook](docs/RUNBOOK.md).
 
 ## Проверки
 
@@ -60,7 +64,7 @@ ruff format --check .
 pytest
 ```
 
-Тесты используют только fake/deterministic providers и не требуют внешних API.
+Тесты используют fake/deterministic providers и не требуют внешних AI API. PostgreSQL/MCP integration-тесты требуют `DATABASE_URL` и выполняются в CI с pgvector.
 
 ## Связанные репозитории
 
@@ -70,4 +74,4 @@ pytest
 
 ## Текущий этап
 
-**M0 — проектный baseline** и **M1 — минимальный каркас и CI** завершены. Следующий этап — **M2**: локальный document RAG baseline. Docker Compose пока не добавлен, поскольку реальных сервисов ещё нет.
+**M0–M2** завершены. Следующий этап — **M3**: grounding, явный отказ и оценка качества. Текущая версия не имеет авторизации и предназначена только для loopback/stdio с синтетическими документами.

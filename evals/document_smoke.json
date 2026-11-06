@@ -1,0 +1,14 @@
+[
+  {
+    "question": "What is the maximum notional value of a single order?",
+    "expected_source": "risk-limits.md"
+  },
+  {
+    "question": "Which component matches orders using price-time priority?",
+    "expected_source": "matching-engine.md"
+  },
+  {
+    "question": "When is a market data update considered stale?",
+    "expected_source": "market-data.md"
+  }
+]
