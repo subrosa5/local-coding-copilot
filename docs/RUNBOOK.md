@@ -16,11 +16,14 @@ python -m local_coding_copilot.rag_cli ingest data/synthetic
 python -m local_coding_copilot.smoke
 ```
 
-Запрос через CLI:
+Запрос через CLI в grounded-режиме (по умолчанию) или fast:
 
 ```bash
 python -m local_coding_copilot.rag_cli query "What is the maximum order notional?"
+python -m local_coding_copilot.rag_cli query "Unknown question" --mode fast
 ```
+
+Grounded требует существующие citations и проверяет числа по процитированному тексту. При отсутствии релевантных источников оба режима возвращают `refused=true` с машинным `refusal_reason`.
 
 HTTP на `127.0.0.1:8000`:
 
@@ -38,7 +41,7 @@ MCP stdio server запускается клиентом командой:
 python -m local_coding_copilot.mcp_server
 ```
 
-Инструмент `query_documents` принимает `question` и опциональный `limit`. HTTP и MCP вызывают один `DocumentRAGService`.
+Инструмент `query_documents` принимает `question`, опциональные `limit` и `mode`. HTTP принимает те же поля. HTTP и MCP вызывают один `DocumentRAGService`.
 
 Остановить БД: `docker compose stop db`. Данные сохраняются в Docker volume `copilot-postgres`.
 
@@ -49,7 +52,10 @@ ruff check .
 ruff format --check .
 pytest
 python -m local_coding_copilot.smoke
+python -m local_coding_copilot.evaluation
 ```
+
+Evaluation сохраняет `data/runtime/m3-evaluation.json`, сравнивает baseline и grounded RAG на одном SHA-256 dataset и проверяет recall@5, correct refusal и false refusal rate. CI сохраняет отчёт как artifact для каждой версии Python.
 
 Без `DATABASE_URL` PostgreSQL/MCP integration-тесты пропускаются. В CI они выполняются с реальным pgvector на Python 3.11 и 3.13. Внешние AI API не используются.
 

@@ -30,7 +30,12 @@ CREATE TABLE IF NOT EXISTS rag_chunks (
 
 _SEARCH = """
 WITH params AS (
-    SELECT %s::vector AS embedding, websearch_to_tsquery('russian', %s) AS query
+    SELECT
+        %s::vector AS embedding,
+        (
+            SELECT to_tsquery('russian', string_agg(lexeme, ' | '))
+            FROM unnest(tsvector_to_array(to_tsvector('russian', %s))) AS terms(lexeme)
+        ) AS query
 ),
 vector_candidates AS (
     SELECT

@@ -16,7 +16,8 @@ def test_rag_service_returns_citations_and_retrieval_trace(
 
     response = rag_service.query("maximum order notional")
 
-    assert response.answer == "Grounded fake answer"
+    assert response.answer == "Grounded fake answer [1]"
+    assert not response.refused
     assert response.citations[0].source == "risk.md"
     assert response.citations[0].version == "v1"
     assert response.citations[0].start_line == 1

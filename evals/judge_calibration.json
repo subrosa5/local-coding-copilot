@@ -1,0 +1,44 @@
+[
+  {
+    "question": "What is the order limit?",
+    "answer": "The limit is 1000000 USD.",
+    "evidence": "The order limit is 1000000 USD.",
+    "manual_supported": true,
+    "judge_response": "{\"supported\": true}"
+  },
+  {
+    "question": "What is the order limit?",
+    "answer": "The limit is 42 USD.",
+    "evidence": "The order limit is 1000000 USD.",
+    "manual_supported": false,
+    "judge_response": "{\"supported\": false}"
+  },
+  {
+    "question": "How are orders matched?",
+    "answer": "Orders use price-time priority.",
+    "evidence": "Orders are matched using price-time priority.",
+    "manual_supported": true,
+    "judge_response": "{\"supported\": true}"
+  },
+  {
+    "question": "When is an update stale?",
+    "answer": "After ten seconds.",
+    "evidence": "An update is stale after five seconds.",
+    "manual_supported": false,
+    "judge_response": "{\"supported\": false}"
+  },
+  {
+    "question": "When is an update stale?",
+    "answer": "After five seconds.",
+    "evidence": "An update is stale after five seconds.",
+    "manual_supported": true,
+    "judge_response": "{\"supported\": false}"
+  },
+  {
+    "question": "When is an update stale?",
+    "answer": "After twenty seconds.",
+    "evidence": "An update is stale after five seconds.",
+    "manual_supported": false,
+    "judge_response": "{\"supported\": true}"
+  }
+]

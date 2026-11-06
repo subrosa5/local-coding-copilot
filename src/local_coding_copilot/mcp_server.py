@@ -5,15 +5,18 @@ from mcp.server.mcpserver import MCPServer
 
 from local_coding_copilot.bootstrap import build_rag_service
 from local_coding_copilot.rag import DocumentRAGService
+from local_coding_copilot.rag.models import AnswerMode
 
 
 def create_mcp_server(service: DocumentRAGService) -> MCPServer:
     server = MCPServer(name="local-coding-copilot", version="0.1.0")
 
     @server.tool()
-    def query_documents(question: str, limit: int = 5) -> dict[str, Any]:
+    def query_documents(
+        question: str, limit: int = 5, mode: AnswerMode = "grounded"
+    ) -> dict[str, Any]:
         """Answer a question from indexed project documents with citations."""
-        return asdict(service.query(question, limit))
+        return asdict(service.query(question, limit, mode))
 
     return server
 

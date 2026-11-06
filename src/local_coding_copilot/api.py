@@ -1,4 +1,5 @@
 import os
+from typing import Literal
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -11,6 +12,7 @@ from local_coding_copilot.rag import DocumentRAGService, QueryResponse
 class QueryRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     limit: int = Field(default=5, ge=1, le=20)
+    mode: Literal["fast", "grounded"] = "grounded"
 
 
 def create_app(service: DocumentRAGService) -> FastAPI:
@@ -23,7 +25,7 @@ def create_app(service: DocumentRAGService) -> FastAPI:
     @app.post("/v1/query")
     def query(request: QueryRequest) -> QueryResponse:
         try:
-            return service.query(request.question, request.limit)
+            return service.query(request.question, request.limit, request.mode)
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 

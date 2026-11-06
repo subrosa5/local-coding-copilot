@@ -14,7 +14,9 @@ def test_http_query_uses_the_rag_service(rag_service: DocumentRAGService) -> Non
 
     assert response.status_code == 200
     body = response.json()
-    assert body["answer"] == "Grounded fake answer"
+    assert body["answer"] == "Grounded fake answer [1]"
+    assert body["mode"] == "grounded"
+    assert not body["refused"]
     assert body["citations"][0]["source"] == "risk.md"
     assert body["retrieval"][0]["chunk_id"] == "risk:0"
 

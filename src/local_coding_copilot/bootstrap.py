@@ -15,5 +15,8 @@ def build_rag_service(dsn: str | None = None) -> DocumentRAGService:
     return DocumentRAGService(
         repository=repository,
         embeddings=FakeEmbeddingProvider(),
-        llm=FakeLLMProvider(response="Fake model received the retrieved context."),
+        llm=FakeLLMProvider(
+            response="Fake model received the retrieved context.", cite_sources=True
+        ),
+        min_vector_score=0.99,
     )

@@ -5,13 +5,27 @@ from local_coding_copilot.models import ChatRequest, ChatResponse, RerankResult
 
 
 class FakeLLMProvider:
-    def __init__(self, response: str = "Fake provider response.") -> None:
+    def __init__(
+        self, response: str = "Fake provider response.", cite_sources: bool = False
+    ) -> None:
         self._response = response
+        self._cite_sources = cite_sources
 
     def complete(self, request: ChatRequest) -> ChatResponse:
         if not request.messages:
             raise ValueError("At least one message is required")
-        return ChatResponse(content=self._response)
+        context = next(
+            (
+                message.content.split("Context:\n", 1)[1]
+                for message in request.messages
+                if "Context:\n" in message.content
+            ),
+            "",
+        )
+        citation_count = sum(line.startswith("[") for line in context.splitlines())
+        citations = "".join(f"[{index}]" for index in range(1, citation_count + 1))
+        suffix = f" {citations}" if self._cite_sources and citations else ""
+        return ChatResponse(content=self._response + suffix)
 
 
 class FakeEmbeddingProvider:
