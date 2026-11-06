@@ -32,7 +32,7 @@
 
 ## M2 — Локальный document RAG baseline
 
-**Статус:** in_progress.
+**Статус:** done.
 
 - PostgreSQL/pgvector и ingestion синтетических документов.
 - Hybrid retrieval и provider-based embeddings.
