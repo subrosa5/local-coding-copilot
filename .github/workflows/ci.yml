@@ -10,10 +10,26 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://copilot:copilot@127.0.0.1:5432/copilot
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.13"]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: copilot
+          POSTGRES_USER: copilot
+          POSTGRES_PASSWORD: copilot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U copilot -d copilot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -24,3 +40,5 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest
+      - run: python -m local_coding_copilot.rag_cli ingest data/synthetic
+      - run: python -m local_coding_copilot.smoke
