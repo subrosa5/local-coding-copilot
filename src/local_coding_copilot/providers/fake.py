@@ -14,11 +14,17 @@ class FakeLLMProvider:
     def complete(self, request: ChatRequest) -> ChatResponse:
         if not request.messages:
             raise ValueError("At least one message is required")
-        has_context = any(
-            "Context:\n" in message.content and message.content.split("Context:\n")[1]
-            for message in request.messages
+        context = next(
+            (
+                message.content.split("Context:\n", 1)[1]
+                for message in request.messages
+                if "Context:\n" in message.content
+            ),
+            "",
         )
-        suffix = " [1]" if self._cite_sources and has_context else ""
+        citation_count = sum(line.startswith("[") for line in context.splitlines())
+        citations = "".join(f"[{index}]" for index in range(1, citation_count + 1))
+        suffix = f" {citations}" if self._cite_sources and citations else ""
         return ChatResponse(content=self._response + suffix)
 
 
