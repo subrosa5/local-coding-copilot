@@ -59,6 +59,10 @@ Grounded path дополнительно проверяет существова
 
 LLM-judge не считается абсолютным источником истины. `evals/judge_calibration.json` содержит 6 ручных labels и намеренные ошибки simulated judge outputs. M3 проверяет parsing и расчёт agreement (4/6), а **не качество реального LLM-judge**. Поле `simulated_outputs=true` делает это ограничение явным. Калибровку реальной модели нужно повторить в M7. Детерминированные проверки предпочтительнее: существование citation, точное значение, компиляция и тесты.
 
+## Фактический fake-provider прогон M3
+
+CI на Python 3.11 и 3.13 дал одинаковый результат: baseline task success `0/30`, grounded RAG `29/30`, Recall@5 `25/26`, correct refusal `4/4`. False refusal rate на answerable кейсах — `1/26`; этот провал остаётся видимым в per-case artifact. Simulated judge agreement — `4/6`. Эти цифры проверяют контур и метрики, но не являются качеством реальной LLM.
+
 ## Протокол
 
 1. Зафиксировать dataset version, model, quantization, prompts, parameters и commit.

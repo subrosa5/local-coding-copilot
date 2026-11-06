@@ -43,7 +43,7 @@
 
 ## M3 — Grounding и оценка качества
 
-**Статус:** in_progress.
+**Статус:** done.
 
 - Проверяемые citations и явный отказ.
 - Fast/grounded режимы.
