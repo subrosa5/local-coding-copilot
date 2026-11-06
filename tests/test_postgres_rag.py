@@ -30,7 +30,8 @@ def test_postgres_hybrid_retrieval(postgres_service: DocumentRAGService) -> None
     response = postgres_service.query("maximum notional value", limit=3)
 
     assert response.citations[0].source == "risk-limits.md"
-    assert response.citations[0].start_line == 3
+    assert (response.citations[0].start_line, response.citations[0].end_line) == (1, 7)
+    assert "maximum notional value" in response.citations[0].text
     assert response.retrieval[0].lexical_score > 0
     assert len(response.citations[0].version) == 64
 
