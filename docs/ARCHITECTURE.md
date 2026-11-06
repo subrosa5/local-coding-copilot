@@ -30,12 +30,12 @@ HTTP client / MCP client / IDE
 
 ### Provider interfaces
 
-Планируются независимые контракты:
+В `src/local_coding_copilot/providers/contracts.py` определены независимые контракты:
 
-- `LLMProvider` — chat/tool calling через внешний или OpenAI-compatible local endpoint;
+- `LLMProvider` — chat/tool calling; адаптеры внешнего или OpenAI-compatible local endpoint ещё предстоит реализовать;
 - `EmbeddingProvider` — локальные embeddings;
 - `RerankerProvider` — локальный reranking;
-- `FakeProvider` — детерминированные CI-тесты без внешних API.
+- fake implementations — детерминированные CI-тесты без внешних API.
 
 POC не должен зависеть от конкретного облачного провайдера.
 
