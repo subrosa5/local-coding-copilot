@@ -51,7 +51,7 @@ docker compose up -d db
 export DATABASE_URL=postgresql://copilot:copilot@127.0.0.1:5432/copilot
 python -m local_coding_copilot.rag_cli ingest data/synthetic
 python -m local_coding_copilot.smoke
-python -m local_coding_copilot.evaluate
+python -m local_coding_copilot.evaluation
 python -m local_coding_copilot.rag_cli query "What is the maximum order notional?"
 ```
 

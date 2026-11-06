@@ -52,7 +52,7 @@ ruff check .
 ruff format --check .
 pytest
 python -m local_coding_copilot.smoke
-python -m local_coding_copilot.evaluate
+python -m local_coding_copilot.evaluation
 ```
 
 Evaluation сохраняет `data/runtime/m3-evaluation.json`, сравнивает baseline и grounded RAG на одном SHA-256 dataset и проверяет recall@5, correct refusal и false refusal rate. CI сохраняет отчёт как artifact для каждой версии Python.
