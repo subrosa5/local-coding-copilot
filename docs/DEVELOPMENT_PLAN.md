@@ -21,7 +21,7 @@
 
 ## M1 — Минимальный каркас и CI
 
-**Статус:** todo.
+**Статус:** done.
 
 - Создать минимальный Python application skeleton.
 - Определить provider contracts и fake implementations.
