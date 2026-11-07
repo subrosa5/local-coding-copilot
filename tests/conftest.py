@@ -106,4 +106,6 @@ def rag_service() -> DocumentRAGService:
 def application(
     rag_service: DocumentRAGService, admin_principal: Principal
 ) -> Application:
-    return Application(rag_service, StaticAuthService(admin_principal))
+    return Application(
+        rag_service, StaticAuthService(admin_principal), code_service=rag_service
+    )

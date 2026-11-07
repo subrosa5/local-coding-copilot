@@ -31,6 +31,26 @@ def create_mcp_server(application: Application) -> MCPServer:
             )
         )
 
+    @server.tool()
+    def query_code(
+        question: str,
+        limit: int = 5,
+        mode: AnswerMode = "grounded",
+        project_id: str = "default",
+    ) -> dict[str, Any]:
+        """Find project code with symbol, path and commit-aware citations."""
+        principal = application.auth.authenticate(api_token())
+        return asdict(
+            application.code_service.query(
+                question,
+                limit,
+                mode,
+                principal=principal,
+                project_id=project_id,
+                transport="mcp",
+            )
+        )
+
     return server
 
 

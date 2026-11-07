@@ -24,6 +24,10 @@ class Chunk:
     end_line: int
     content: str
     project_id: str = "default"
+    repository: str | None = None
+    symbol: str | None = None
+    symbol_kind: str | None = None
+    commit_sha: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +48,10 @@ class Citation:
     end_line: int
     text: str
     project_id: str = "default"
+    repository: str | None = None
+    symbol: str | None = None
+    symbol_kind: str | None = None
+    commit_sha: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +63,10 @@ class RetrievalTraceItem:
     lexical_score: float
     selected: bool
     project_id: str = "default"
+    repository: str | None = None
+    symbol: str | None = None
+    symbol_kind: str | None = None
+    commit_sha: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

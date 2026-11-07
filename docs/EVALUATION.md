@@ -14,7 +14,7 @@
 
 ### Code set
 
-Планируется 20–30 задач в `exchange-demo` с исходным commit и скрытыми acceptance tests: bug fix, небольшая feature, refactoring, API compatibility, test repair и cross-service change.
+`exchange-demo` содержит зафиксированный Git history, правила, unittest suite и три намеренных дефекта с expected failures. Code RAG integration-тесты проверяют symbol/path/commit retrieval и incremental updates. Набор из 20–30 coding-задач с исходным commit и скрытыми acceptance tests планируется отдельно: bug fix, небольшая feature, refactoring, API compatibility, test repair и cross-service change.
 
 Eval-задачи нельзя использовать для fine-tuning.
 
@@ -31,7 +31,7 @@ Eval-задачи нельзя использовать для fine-tuning.
 
 ### Retrieval
 
-Текущий runner измеряет Recall@5 по ожидаемым source и сохраняет retrieval sources для каждого кейса. Для code RAG позже добавятся repo/path/commit и Recall@10/@20. Security-тесты M4 отдельно проверяют отсутствие чужого проекта в citations и retrieval trace.
+Document runner измеряет Recall@5 по ожидаемым source и сохраняет retrieval sources для каждого кейса. Code RAG integration-тесты проверяют repo/path/symbol/line/commit и удаление устаревших chunks; полноценный code golden set с Recall@10/@20 ещё предстоит добавить. Security-тесты отдельно проверяют отсутствие чужого проекта в citations и retrieval trace.
 
 ### Ответы
 
