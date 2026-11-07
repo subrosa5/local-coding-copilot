@@ -66,11 +66,13 @@ Document query реализован без дополнительного agent 
 
 Оба режима отказывают при отсутствии релевантных источников. Grounding-проверки не доказывают смысловую истинность каждого утверждения и не являются security boundary. LLM-judge используется только в отдельной calibration harness, не в production answer path.
 
-Coding workflow ограничен числом итераций и не может самостоятельно выполнить merge.
+`CodingOrchestrator` доступен через CLI только admin с membership в проекте. Он делает первую попытку и не более двух repair iterations, получая unified diff через `PatchProvider`. Текущий `StaticPatchProvider` читает заранее подготовленные `.patch` файлы: это deterministic harness для проверки orchestration, а не генерация кода LLM. После compileall и unittest результат `awaiting_review` содержит diff, SHA-256, changed files, признак изменения тестов и технические результаты проверок. Merge API отсутствует.
 
 ### Git workspace и sandbox
 
-Изменения выполняются только в отдельном Git worktree. Код запускается в одноразовом контейнере с отключённой сетью, non-root пользователем, read-only root и лимитами CPU/RAM/времени.
+`GitWorktreeManager` требует чистый исходный checkout, создаёт detached worktree от зафиксированного commit и применяет patch через `git apply`. Исходный checkout не редактируется. Рабочие worktrees сохраняются для review и удаляются человеком отдельной командой.
+
+`DockerSandbox` монтирует только disposable worktree как `/workspace`. Контейнер получает `network=none`, read-only root, non-root UID/GID, `cap-drop=ALL`, `no-new-privileges`, 512 МБ RAM, 1 CPU, лимит 128 процессов и timeout. Host environment и Docker socket внутрь не передаются. При timeout runner принудительно удаляет только созданный им контейнер. Это POC-изоляция, а не замена отдельным CI-нодам или более сильному sandbox для недоверенного production-кода.
 
 ### Хранение
 

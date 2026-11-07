@@ -87,6 +87,29 @@ HTTP endpoint: `POST /v1/code/query` с тем же Bearer auth и JSON, что 
 
 В M5 поддерживается Python. Другие языки, очередь фоновой индексации, большие monorepo и reranker не входят в текущий gate.
 
+## Coding loop и ручной review
+
+Предварительно загрузите образ и используйте admin token проекта. Исходный checkout должен быть чистым:
+
+```bash
+docker pull python:3.11-slim
+python -m local_coding_copilot.coding_cli \
+  --repository ../exchange-demo --task-id notional-boundary \
+  --project-id default
+```
+
+Доступные task ID: `notional-boundary`, `price-time-priority`, `stale-threshold`. `StaticPatchProvider` выбирает подготовленный patch из `evals/coding_tasks.json`; реальная LLM код пока не генерирует. CLI создаёт detached worktree в `data/runtime/worktrees`, применяет unified diff и запускает `compileall` и `unittest` в Docker без сети. Допускается первоначальная попытка и максимум два repair.
+
+При успехе статус `awaiting_review`, а JSON содержит worktree, base commit, diff, diff SHA-256, changed files, `tests_changed`, stdout/stderr tails и результаты build/test. Подготовленные исправления удаляют соответствующий `@unittest.expectedFailure`, поэтому `tests_changed=true` ожидаемо, но обязательно проверяется человеком. Статус не означает approval или merge.
+
+Проверьте diff и тесты вручную. Merge выполняется только человеком вне этого CLI. После review удалите временный worktree, подставив путь из результата:
+
+```bash
+git -C ../exchange-demo worktree remove --force /absolute/path/from/result
+```
+
+Не удаляйте worktree до завершения review. При ошибке исследуйте технические tails в JSON; полные логи и diff не записываются в audit.
+
 ## Rate limits и audit
 
 В POC действует in-memory sliding window: 60 запросов на пользователя за 60 секунд. Лимит применяется после аутентификации и до embeddings/retrieval. Он отдельный для каждого процесса, сбрасывается при перезапуске и не является distributed production-лимитом.

@@ -74,7 +74,7 @@
 
 ## M6 — Coding loop и sandbox
 
-**Статус:** todo.
+**Статус:** in_progress.
 
 - Git worktree, unified diff, build/test/lint.
 - Sandbox без сети и секретов, resource limits и timeout.

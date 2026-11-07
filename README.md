@@ -2,7 +2,7 @@
 
 Локальный coding-ассистент с доказательными ответами, RAG по исходному коду, tool calling и изолированным выполнением тестов.
 
-**Статус:** document RAG поддерживает fast/grounded режимы, проверку citations и явный отказ. Добавлены 30 golden-кейсов и baseline/RAG evaluation. Реализованы локальные токены, роли, проектные ACL, rate limits и технический audit. Code RAG индексирует tracked Python-файлы через Git и Tree-sitter, поддерживает exact/hybrid search, AST metadata, commit-aware citations и incremental updates. Пока используются fake embeddings/LLM; sandbox и реальные модели ещё не реализованы.
+**Статус:** document RAG поддерживает fast/grounded режимы, проверку citations и явный отказ. Реализованы локальные токены, роли, проектные ACL, rate limits и технический audit. Code RAG индексирует tracked Python-файлы через Git и Tree-sitter с commit-aware citations и incremental updates. Coding loop применяет подготовленные unified diff в отдельном worktree и запускает compileall/unittest в Docker без сети; успешный patch ожидает ручного review. Сейчас используются fake embeddings/LLM и детерминированный patch provider, реальные модели относятся к M7.
 
 ## Цель
 
@@ -86,4 +86,4 @@ pytest
 
 ## Текущий этап
 
-**M0–M5** завершены: document/code RAG, ACL, security baseline, AST metadata, commit-aware citations и incremental indexing проверены в CI. Следующий этап — **M6**: coding loop, Git worktree и sandbox. Версия предназначена только для синтетических документов и кода.
+**M0–M5** завершены: document/code RAG, ACL, security baseline, AST metadata, commit-aware citations и incremental indexing проверены в CI. Активный этап — **M6**: deterministic coding loop, Git worktree и Docker sandbox проходят финальный CI gate. Версия предназначена только для синтетических документов и кода.

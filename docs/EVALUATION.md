@@ -14,7 +14,7 @@
 
 ### Code set
 
-`exchange-demo` содержит зафиксированный Git history, правила, unittest suite и три намеренных дефекта с expected failures. Code RAG integration-тесты проверяют symbol/path/commit retrieval и incremental updates. Набор из 20–30 coding-задач с исходным commit и скрытыми acceptance tests планируется отдельно: bug fix, небольшая feature, refactoring, API compatibility, test repair и cross-service change.
+`exchange-demo` содержит зафиксированный Git history, правила, unittest suite и три намеренных дефекта с expected failures. Code RAG integration-тесты проверяют symbol/path/commit retrieval и incremental updates. `evals/coding_tasks.json` и три `.patch` файла задают deterministic M6 harness: CI применяет каждый patch к синтетической копии репозитория и выполняет реальные compileall/unittest в Docker. Это проверяет patch/test/review контур, но не pass@1 генерации LLM. Набор из 20–30 coding-задач с исходным commit и скрытыми acceptance tests планируется отдельно: bug fix, небольшая feature, refactoring, API compatibility, test repair и cross-service change.
 
 Eval-задачи нельзя использовать для fine-tuning.
 
