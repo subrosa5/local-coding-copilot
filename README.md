@@ -86,4 +86,4 @@ pytest
 
 ## Текущий этап
 
-**M0–M4** завершены, **M5** находится в работе: code RAG, AST metadata, commit-aware citations и incremental indexing. Версия предназначена только для loopback/stdio с синтетическими документами и кодом.
+**M0–M5** завершены: document/code RAG, ACL, security baseline, AST metadata, commit-aware citations и incremental indexing проверены в CI. Следующий этап — **M6**: coding loop, Git worktree и sandbox. Версия предназначена только для синтетических документов и кода.
