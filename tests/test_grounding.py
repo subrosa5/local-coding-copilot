@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 
+from local_coding_copilot.auth import Principal
 from local_coding_copilot.providers import FakeEmbeddingProvider, FakeLLMProvider
 from local_coding_copilot.rag.grounding import validate_grounding
 from local_coding_copilot.rag.models import Chunk, Document, SearchResult
@@ -47,7 +48,12 @@ class IrrelevantRepository:
         pass
 
     def search(
-        self, query: str, embedding: Sequence[float], limit: int
+        self,
+        query: str,
+        embedding: Sequence[float],
+        limit: int,
+        user_id: str,
+        project_id: str,
     ) -> list[SearchResult]:
         result = make_result("Unrelated evidence")
         return [
@@ -56,15 +62,27 @@ class IrrelevantRepository:
             )
         ]
 
+    def record_audit(
+        self,
+        user_id: str,
+        project_id: str,
+        action: str,
+        transport: str,
+        outcome: str,
+        reason: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> None:
+        pass
 
-def test_service_refuses_without_relevant_evidence() -> None:
+
+def test_service_refuses_without_relevant_evidence(admin_principal: Principal) -> None:
     service = DocumentRAGService(
         repository=IrrelevantRepository(),
         embeddings=FakeEmbeddingProvider(),
         llm=FakeLLMProvider(cite_sources=True),
     )
 
-    response = service.query("Unknown question")
+    response = service.query("Unknown question", principal=admin_principal)
 
     assert response.refused
     assert response.refusal_reason == "no_relevant_evidence"
@@ -74,12 +92,17 @@ def test_service_refuses_without_relevant_evidence() -> None:
 
 class RelevantRepository(IrrelevantRepository):
     def search(
-        self, query: str, embedding: Sequence[float], limit: int
+        self,
+        query: str,
+        embedding: Sequence[float],
+        limit: int,
+        user_id: str,
+        project_id: str,
     ) -> list[SearchResult]:
         return [make_result()]
 
 
-def test_fast_mode_exposes_uncited_model_answer() -> None:
+def test_fast_mode_exposes_uncited_model_answer(admin_principal: Principal) -> None:
     service = DocumentRAGService(
         repository=RelevantRepository(),
         embeddings=FakeEmbeddingProvider(),
@@ -87,7 +110,7 @@ def test_fast_mode_exposes_uncited_model_answer() -> None:
         min_vector_score=0.1,
     )
 
-    response = service.query("Question", mode="fast")
+    response = service.query("Question", mode="fast", principal=admin_principal)
 
     assert not response.refused
     assert response.answer == "Uncited answer"

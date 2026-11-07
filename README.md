@@ -2,7 +2,7 @@
 
 Локальный coding-ассистент с доказательными ответами, RAG по исходному коду, tool calling и изолированным выполнением тестов.
 
-**Статус:** document RAG поддерживает fast/grounded режимы, проверку citations и явный отказ. Добавлены 30 golden-кейсов и baseline/RAG evaluation. Пока используются fake embeddings/LLM; авторизация, code RAG, sandbox и реальные модели ещё не реализованы.
+**Статус:** document RAG поддерживает fast/grounded режимы, проверку citations и явный отказ. Добавлены 30 golden-кейсов и baseline/RAG evaluation. Реализованы локальные токены, роли, проектные ACL, rate limits и технический audit. Пока используются fake embeddings/LLM; code RAG, sandbox и реальные модели ещё не реализованы.
 
 ## Цель
 
@@ -49,13 +49,15 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 docker compose up -d db
 export DATABASE_URL=postgresql://copilot:copilot@127.0.0.1:5432/copilot
+export COPILOT_API_TOKEN=$(python -m local_coding_copilot.security_cli \
+  --user-id admin --role admin --project-id default)
 python -m local_coding_copilot.rag_cli ingest data/synthetic
 python -m local_coding_copilot.smoke
 python -m local_coding_copilot.evaluation
 python -m local_coding_copilot.rag_cli query "What is the maximum order notional?"
 ```
 
-HTTP: `python -m local_coding_copilot.api`. MCP stdio: `python -m local_coding_copilot.mcp_server`. Подробности в [runbook](docs/RUNBOOK.md).
+HTTP: `python -m local_coding_copilot.api`. MCP stdio: `python -m local_coding_copilot.mcp_server`. Оба используют тот же токен и project ACL. Подробности в [runbook](docs/RUNBOOK.md).
 
 ## Проверки
 
@@ -75,4 +77,4 @@ pytest
 
 ## Текущий этап
 
-**M0–M3** завершены. Следующий этап — **M4**: локальные пользователи, tokens, проектные ACL и security baseline. До M4 текущая версия предназначена только для loopback/stdio с синтетическими документами.
+**M0–M3** завершены, **M4** находится в работе: локальные пользователи, tokens, проектные ACL, rate limits, audit и security-тесты. Версия предназначена только для loopback/stdio с синтетическими документами.

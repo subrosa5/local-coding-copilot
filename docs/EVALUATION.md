@@ -10,7 +10,7 @@
 
 `evals/document_golden.json` содержит 30 вручную сопоставленных с синтетическими документами вопросов: 26 answerable и 4 out-of-scope. Есть русские формулировки, опечатки, два multi-source вопроса и prompt-injection случай.
 
-Версия набора фиксируется SHA-256 в отчёте. `evals/document_smoke.json` остаётся отдельным коротким smoke set. Устаревшие источники, cross-project ACL и полноценная semantic correctness оцениваются на следующих этапах; текущий набор не покрывает эти свойства.
+Версия набора фиксируется SHA-256 в отчёте. `evals/document_smoke.json` остаётся отдельным коротким smoke set. Устаревшие источники и полноценная semantic correctness оцениваются на следующих этапах; текущий golden set не покрывает эти свойства. Cross-project leakage проверяется отдельными PostgreSQL/HTTP/MCP security-тестами M4.
 
 ### Code set
 
@@ -31,7 +31,7 @@ Eval-задачи нельзя использовать для fine-tuning.
 
 ### Retrieval
 
-Текущий runner измеряет Recall@5 по ожидаемым source и сохраняет retrieval sources для каждого кейса. Для code RAG позже добавятся repo/path/commit и Recall@10/@20. Cross-project leakage будет измеряться после ACL в M4.
+Текущий runner измеряет Recall@5 по ожидаемым source и сохраняет retrieval sources для каждого кейса. Для code RAG позже добавятся repo/path/commit и Recall@10/@20. Security-тесты M4 отдельно проверяют отсутствие чужого проекта в citations и retrieval trace.
 
 ### Ответы
 

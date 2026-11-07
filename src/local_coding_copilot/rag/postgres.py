@@ -2,19 +2,47 @@ from collections.abc import Sequence
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from local_coding_copilot.rag.models import Chunk, Document, SearchResult
 
 _SCHEMA = """
 CREATE EXTENSION IF NOT EXISTS vector;
 
+CREATE TABLE IF NOT EXISTS app_users (
+    user_id TEXT PRIMARY KEY,
+    role TEXT NOT NULL CHECK (role IN ('admin', 'viewer')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS projects (
+    project_id TEXT PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS project_members (
+    user_id TEXT NOT NULL REFERENCES app_users ON DELETE CASCADE,
+    project_id TEXT NOT NULL REFERENCES projects ON DELETE CASCADE,
+    PRIMARY KEY (user_id, project_id)
+);
+
+CREATE TABLE IF NOT EXISTS api_tokens (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES app_users ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS rag_documents (
     document_id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL DEFAULT 'default',
     source TEXT NOT NULL,
     version TEXT NOT NULL,
     content TEXT NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE rag_documents
+    ADD COLUMN IF NOT EXISTS project_id TEXT NOT NULL DEFAULT 'default';
 
 CREATE TABLE IF NOT EXISTS rag_chunks (
     chunk_id TEXT PRIMARY KEY,
@@ -25,6 +53,18 @@ CREATE TABLE IF NOT EXISTS rag_chunks (
     content TEXT NOT NULL,
     embedding vector NOT NULL,
     UNIQUE (document_id, chunk_index)
+);
+
+CREATE TABLE IF NOT EXISTS audit_events (
+    event_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    transport TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    reason TEXT,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 """
 
@@ -37,12 +77,21 @@ WITH params AS (
             FROM unnest(tsvector_to_array(to_tsvector('russian', %s))) AS terms(lexeme)
         ) AS query
 ),
+visible_chunks AS (
+    SELECT chunks.*
+    FROM rag_chunks AS chunks
+    JOIN rag_documents AS documents
+        ON documents.document_id = chunks.document_id
+    JOIN project_members AS members
+        ON members.project_id = documents.project_id
+    WHERE members.user_id = %s AND documents.project_id = %s
+),
 vector_candidates AS (
     SELECT
         chunks.chunk_id,
         1 - (chunks.embedding <=> params.embedding) AS score,
         ROW_NUMBER() OVER (ORDER BY chunks.embedding <=> params.embedding) AS rank
-    FROM rag_chunks AS chunks, params
+    FROM visible_chunks AS chunks, params
 ),
 lexical_candidates AS (
     SELECT
@@ -53,7 +102,7 @@ lexical_candidates AS (
                 ts_rank_cd(to_tsvector('russian', chunks.content), params.query) DESC,
                 chunks.chunk_id
         ) AS rank
-    FROM rag_chunks AS chunks, params
+    FROM visible_chunks AS chunks, params
     WHERE to_tsvector('russian', chunks.content) @@ params.query
 ),
 combined AS (
@@ -71,6 +120,7 @@ combined AS (
 SELECT
     chunks.chunk_id,
     chunks.document_id,
+    documents.project_id,
     documents.source,
     documents.version,
     chunks.chunk_index,
@@ -112,11 +162,13 @@ class PostgresDocumentRepository:
             )
             cursor.execute(
                 """
-                INSERT INTO rag_documents (document_id, source, version, content)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO rag_documents (
+                    document_id, project_id, source, version, content
+                ) VALUES (%s, %s, %s, %s, %s)
                 """,
                 (
                     document.document_id,
+                    document.project_id,
                     document.source,
                     document.version,
                     document.content,
@@ -142,13 +194,21 @@ class PostgresDocumentRepository:
                 )
 
     def search(
-        self, query: str, embedding: Sequence[float], limit: int
+        self,
+        query: str,
+        embedding: Sequence[float],
+        limit: int,
+        user_id: str,
+        project_id: str,
     ) -> list[SearchResult]:
         with (
             psycopg.connect(self._dsn, row_factory=dict_row) as connection,
             connection.cursor() as cursor,
         ):
-            cursor.execute(_SEARCH, (_vector_literal(embedding), query, limit))
+            cursor.execute(
+                _SEARCH,
+                (_vector_literal(embedding), query, user_id, project_id, limit),
+            )
             return [
                 SearchResult(
                     chunk=Chunk(
@@ -160,6 +220,7 @@ class PostgresDocumentRepository:
                         start_line=row["start_line"],
                         end_line=row["end_line"],
                         content=row["content"],
+                        project_id=row["project_id"],
                     ),
                     score=row["score"],
                     vector_score=row["vector_score"],
@@ -167,6 +228,34 @@ class PostgresDocumentRepository:
                 )
                 for row in cursor.fetchall()
             ]
+
+    def record_audit(
+        self,
+        user_id: str,
+        project_id: str,
+        action: str,
+        transport: str,
+        outcome: str,
+        reason: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> None:
+        with psycopg.connect(self._dsn) as connection:
+            connection.execute(
+                """
+                INSERT INTO audit_events (
+                    user_id, project_id, action, transport, outcome, reason, metadata
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    user_id,
+                    project_id,
+                    action,
+                    transport,
+                    outcome,
+                    reason,
+                    Jsonb(metadata or {}),
+                ),
+            )
 
 
 def _vector_literal(embedding: Sequence[float]) -> str:

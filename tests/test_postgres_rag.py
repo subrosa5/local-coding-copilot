@@ -8,26 +8,47 @@ from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
 from local_coding_copilot.api import create_app
-from local_coding_copilot.bootstrap import build_rag_service
+from local_coding_copilot.auth import Principal
+from local_coding_copilot.bootstrap import Application, build_application
 from local_coding_copilot.ingestion import load_markdown_documents
-from local_coding_copilot.rag import DocumentRAGService
 
 
 @pytest.fixture(scope="module")
-def postgres_service() -> DocumentRAGService:
+def postgres_application() -> Application:
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
         pytest.skip("DATABASE_URL is not configured")
+    return build_application(dsn)
 
-    service = build_rag_service(dsn)
+
+@pytest.fixture(scope="module")
+def postgres_token(postgres_application: Application) -> str:
+    return postgres_application.auth.create_user(
+        "rag-admin", "admin", frozenset({"default"})
+    )
+
+
+@pytest.fixture(scope="module")
+def postgres_principal(
+    postgres_application: Application, postgres_token: str
+) -> Principal:
+    return postgres_application.auth.authenticate(postgres_token)
+
+
+@pytest.fixture(scope="module")
+def postgres_service(postgres_application: Application, postgres_principal: Principal):
     documents = load_markdown_documents(Path("data/synthetic"))
     for document in documents:
-        service.ingest_document(document)
-    return service
+        postgres_application.service.ingest_document(
+            document, principal=postgres_principal, transport="test"
+        )
+    return postgres_application.service
 
 
-def test_postgres_hybrid_retrieval(postgres_service: DocumentRAGService) -> None:
-    response = postgres_service.query("maximum notional value", limit=3)
+def test_postgres_hybrid_retrieval(postgres_service, postgres_principal) -> None:
+    response = postgres_service.query(
+        "maximum notional value", limit=3, principal=postgres_principal
+    )
 
     assert response.citations[0].source == "risk-limits.md"
     assert (response.citations[0].start_line, response.citations[0].end_line) == (1, 7)
@@ -36,12 +57,15 @@ def test_postgres_hybrid_retrieval(postgres_service: DocumentRAGService) -> None
     assert len(response.citations[0].version) == 64
 
 
-def test_http_with_postgres(postgres_service: DocumentRAGService) -> None:
-    client = TestClient(create_app(postgres_service))
+def test_http_with_postgres(
+    postgres_application: Application, postgres_service, postgres_token: str
+) -> None:
+    client = TestClient(create_app(postgres_application))
 
     response = client.post(
         "/v1/query",
         json={"question": "Which component uses price-time priority?", "limit": 3},
+        headers={"Authorization": f"Bearer {postgres_token}"},
     )
 
     assert response.status_code == 200
@@ -51,11 +75,15 @@ def test_http_with_postgres(postgres_service: DocumentRAGService) -> None:
 
 
 @pytest.mark.anyio
-async def test_mcp_stdio_with_postgres(postgres_service: DocumentRAGService) -> None:
+async def test_mcp_stdio_with_postgres(
+    postgres_application: Application, postgres_service, postgres_token: str
+) -> None:
+    environment = os.environ.copy()
+    environment["COPILOT_API_TOKEN"] = postgres_token
     parameters = StdioServerParameters(
         command=sys.executable,
         args=["-m", "local_coding_copilot.mcp_server"],
-        env=os.environ.copy(),
+        env=environment,
     )
 
     async with (

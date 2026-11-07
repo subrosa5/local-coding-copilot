@@ -26,7 +26,7 @@ HTTP client / MCP client / IDE
 
 ### API и MCP
 
-FastAPI HTTP и MCP stdio вызывают один `DocumentRAGService`. Они не содержат отдельных реализаций retrieval или orchestration. Авторизация будет добавлена в M4; текущие транспорты предназначены только для локальных синтетических данных.
+FastAPI HTTP и MCP stdio вызывают один `Application` с общими `DocumentRAGService` и auth service. Они не содержат отдельных реализаций retrieval или orchestration. HTTP аутентифицирует Bearer token, MCP получает токен из окружения процесса. Права определяются по записи токена и project membership в PostgreSQL, а не по аргументам запроса. Транспорты предназначены только для локальных синтетических данных.
 
 ### Provider interfaces
 
@@ -41,18 +41,18 @@ POC не должен зависеть от конкретного облачн�
 
 ### Retrieval
 
-Document RAG использует PostgreSQL full-text и pgvector candidates, объединённые через Reciprocal Rank Fusion. Повторная индексация атомарно заменяет документ и его chunks. Ответ содержит `source:start_line-end_line@version` и retrieval trace со vector/lexical scores.
+Document RAG использует PostgreSQL full-text и pgvector candidates, объединённые через Reciprocal Rank Fusion. SQL CTE `visible_chunks` ограничивает chunks membership пользователя и выбранным проектом до обоих candidate generators. Повторная индексация атомарно заменяет документ и его chunks. Внутренний document ID имеет namespace проекта, поэтому одинаковые пути разных проектов не перезаписывают друг друга. Ответ содержит `source:start_line-end_line@version`, project ID и retrieval trace со vector/lexical scores.
 
 Для code RAG в M5 дополнительно планируются `ripgrep`, Tree-sitter, AST metadata и commit-aware citations. Reranker provider пока не подключён к document pipeline.
 
 Текущая document-запись содержит:
 
 ```text
-document_id/source/version/chunk_id
+project_id/document_id/source/version/chunk_id
 start_line/end_line/content/embedding
 ```
 
-Project ACL, repository, symbol и commit metadata будут добавлены вместе с соответствующими этапами.
+Repository, symbol и commit metadata будут добавлены вместе с соответствующими этапами.
 
 ### Orchestrator
 

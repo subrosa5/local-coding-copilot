@@ -15,5 +15,21 @@ class DocumentRepository(Protocol):
     ) -> None: ...
 
     def search(
-        self, query: str, embedding: Sequence[float], limit: int
+        self,
+        query: str,
+        embedding: Sequence[float],
+        limit: int,
+        user_id: str,
+        project_id: str,
     ) -> list[SearchResult]: ...
+
+    def record_audit(
+        self,
+        user_id: str,
+        project_id: str,
+        action: str,
+        transport: str,
+        outcome: str,
+        reason: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> None: ...

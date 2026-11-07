@@ -3,26 +3,39 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from local_coding_copilot.bootstrap import build_rag_service
-from local_coding_copilot.rag import DocumentRAGService
+from local_coding_copilot.bootstrap import Application, build_application
 from local_coding_copilot.rag.models import AnswerMode
+from local_coding_copilot.settings import api_token
 
 
-def create_mcp_server(service: DocumentRAGService) -> MCPServer:
+def create_mcp_server(application: Application) -> MCPServer:
     server = MCPServer(name="local-coding-copilot", version="0.1.0")
 
     @server.tool()
     def query_documents(
-        question: str, limit: int = 5, mode: AnswerMode = "grounded"
+        question: str,
+        limit: int = 5,
+        mode: AnswerMode = "grounded",
+        project_id: str = "default",
     ) -> dict[str, Any]:
-        """Answer a question from indexed project documents with citations."""
-        return asdict(service.query(question, limit, mode))
+        """Answer a question from documents visible to the authenticated user."""
+        principal = application.auth.authenticate(api_token())
+        return asdict(
+            application.service.query(
+                question,
+                limit,
+                mode,
+                principal=principal,
+                project_id=project_id,
+                transport="mcp",
+            )
+        )
 
     return server
 
 
 def main() -> None:
-    create_mcp_server(build_rag_service()).run(transport="stdio")
+    create_mcp_server(build_application()).run(transport="stdio")
 
 
 if __name__ == "__main__":
