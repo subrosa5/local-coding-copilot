@@ -43,11 +43,13 @@
 
 ### Sandbox
 
-- Отдельный одноразовый контейнер или более сильная изоляция.
-- Network disabled, non-root, read-only root, отдельный writable workspace.
-- CPU/RAM/process/time limits и принудительное завершение.
-- Нет host Docker socket, production credentials и неограниченных host mounts.
-- Для production рассматриваются gVisor/Kata/VM и отдельные CI-ноды.
+- M6 запускает каждый build/test в отдельном одноразовом Docker container с `network=none`, non-root, read-only root и writable `/workspace`.
+- Действуют лимиты 512 МБ RAM, 1 CPU, 128 PIDs и timeout; после timeout удаляется только контейнер со сгенерированным именем.
+- Монтируется только disposable Git worktree. Host Docker socket, host environment и production credentials в контейнер не передаются.
+- Coding task разрешён только admin с project membership; авторизация выполняется до создания worktree.
+- `tests_changed` и diff SHA включаются в review/audit. Изменённые тесты требуют человеческой проверки: успешный unittest сам по себе не доказывает корректность patch.
+- Интеграционные тесты проверяют network denial, отсутствие host paths/socket, read-only root, non-root и timeout. Лимиты памяти/CPU настроены, но стресс-тестирование изоляции и ресурсов ещё не выполнено.
+- Для production рассматриваются gVisor/Kata/VM и отдельные CI-ноды; Docker POC не является гарантией против всех container escape.
 
 ### Логи и аудит
 

@@ -1,0 +1,19 @@
+diff --git a/src/exchange_demo/market_data.py b/src/exchange_demo/market_data.py
+--- a/src/exchange_demo/market_data.py
++++ b/src/exchange_demo/market_data.py
+@@ -8,4 +8,4 @@ def is_stale(
+ ) -> bool:
+     if stale_after < 0:
+         raise ValueError("Stale threshold must not be negative")
+-    return now - updated_at > stale_after
++    return now - updated_at >= stale_after
+diff --git a/tests/test_market_data.py b/tests/test_market_data.py
+--- a/tests/test_market_data.py
++++ b/tests/test_market_data.py
+@@ -10,6 +10,5 @@ class MarketDataTest(unittest.TestCase):
+     def test_old_snapshot_is_stale(self) -> None:
+         self.assertTrue(is_stale(updated_at=10, now=13))
+
+-    @unittest.expectedFailure
+     def test_snapshot_is_stale_at_threshold(self) -> None:
+         self.assertTrue(is_stale(updated_at=10, now=12, stale_after=2))

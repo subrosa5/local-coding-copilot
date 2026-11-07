@@ -1,0 +1,19 @@
+diff --git a/src/exchange_demo/orders.py b/src/exchange_demo/orders.py
+--- a/src/exchange_demo/orders.py
++++ b/src/exchange_demo/orders.py
+@@ -16,4 +16,4 @@ def validate_order(order: Order) -> None:
+     if order.quantity <= 0:
+         raise ValueError("Quantity must be positive")
+-    if order.price * order.quantity >= MAX_ORDER_NOTIONAL:
++    if order.price * order.quantity > MAX_ORDER_NOTIONAL:
+         raise ValueError("Order notional exceeds the maximum")
+diff --git a/tests/test_orders.py b/tests/test_orders.py
+--- a/tests/test_orders.py
++++ b/tests/test_orders.py
+@@ -7,6 +7,5 @@ class OrderValidationTest(unittest.TestCase):
+     def test_valid_order_is_accepted(self) -> None:
+         validate_order(Order("a", price=100, quantity=10))
+
+-    @unittest.expectedFailure
+     def test_notional_boundary_is_accepted(self) -> None:
+         validate_order(Order("boundary", price=10_000, quantity=100))

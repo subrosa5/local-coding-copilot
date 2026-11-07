@@ -1,0 +1,17 @@
+diff --git a/src/exchange_demo/matching.py b/src/exchange_demo/matching.py
+--- a/src/exchange_demo/matching.py
++++ b/src/exchange_demo/matching.py
+@@ -11,3 +11,3 @@ def best_bid(bids: list[Bid]) -> Bid:
+     if not bids:
+         raise ValueError("At least one bid is required")
+-    return min(bids, key=lambda bid: bid.created_at)
++    return min(bids, key=lambda bid: (-bid.price, bid.created_at))
+diff --git a/tests/test_matching.py b/tests/test_matching.py
+--- a/tests/test_matching.py
++++ b/tests/test_matching.py
+@@ -7,5 +7,4 @@ class MatchingTest(unittest.TestCase):
+-    @unittest.expectedFailure
+     def test_highest_price_wins_before_time(self) -> None:
+         earlier = Bid("earlier", price=100, created_at=1)
+         higher = Bid("higher", price=101, created_at=2)
+         self.assertEqual(best_bid([earlier, higher]), higher)
