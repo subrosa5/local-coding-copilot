@@ -1,16 +1,18 @@
 import json
 from pathlib import Path
 
+from local_coding_copilot.auth import Principal
 from local_coding_copilot.evaluation import calibrate_judge, evaluate_documents
 from local_coding_copilot.providers import FakeLLMProvider
 from local_coding_copilot.rag import Document, DocumentRAGService
 
 
 def test_evaluation_compares_baseline_and_rag_on_same_cases(
-    rag_service: DocumentRAGService,
+    rag_service: DocumentRAGService, admin_principal: Principal
 ) -> None:
     rag_service.ingest_document(
-        Document("risk", "risk.md", "v1", "The order limit is 1000000 USD.")
+        Document("risk", "risk.md", "v1", "The order limit is 1000000 USD."),
+        principal=admin_principal,
     )
     cases = [
         {
@@ -28,7 +30,7 @@ def test_evaluation_compares_baseline_and_rag_on_same_cases(
     ]
     baseline = FakeLLMProvider(response="Uncited baseline")
 
-    report = evaluate_documents(rag_service, baseline, cases)
+    report = evaluate_documents(rag_service, baseline, cases, principal=admin_principal)
 
     assert report["baseline"]["task_success"] == 0.0
     assert report["rag"]["task_success"] == 1.0

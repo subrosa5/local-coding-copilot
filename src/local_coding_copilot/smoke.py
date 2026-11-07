@@ -2,7 +2,8 @@ import argparse
 import json
 from pathlib import Path
 
-from local_coding_copilot.bootstrap import build_rag_service
+from local_coding_copilot.bootstrap import build_application
+from local_coding_copilot.settings import api_token
 
 
 def main() -> int:
@@ -13,10 +14,13 @@ def main() -> int:
     args = parser.parse_args()
 
     cases = json.loads(args.dataset.read_text(encoding="utf-8"))
-    service = build_rag_service()
+    application = build_application()
+    principal = application.auth.authenticate(api_token())
     failures = []
     for case in cases:
-        response = service.query(case["question"], limit=3)
+        response = application.service.query(
+            case["question"], limit=3, principal=principal, transport="smoke"
+        )
         sources = {citation.source for citation in response.citations}
         if case["expected_source"] not in sources:
             failures.append((case["question"], sorted(sources)))

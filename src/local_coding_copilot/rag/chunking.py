@@ -25,6 +25,7 @@ def chunk_document(document: Document, max_chars: int = 800) -> tuple[Chunk, ...
                 start_line=start_line,
                 end_line=end_line,
                 content="\n".join(current_lines),
+                project_id=document.project_id,
             )
         )
 

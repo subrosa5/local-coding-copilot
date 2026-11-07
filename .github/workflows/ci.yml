@@ -40,6 +40,11 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest
+      - name: Create a masked local test token
+        run: |
+          token=$(python -m local_coding_copilot.security_cli --user-id ci-admin --role admin --project-id default)
+          echo "::add-mask::$token"
+          echo "COPILOT_API_TOKEN=$token" >> "$GITHUB_ENV"
       - run: python -m local_coding_copilot.rag_cli ingest data/synthetic
       - run: python -m local_coding_copilot.smoke
       - run: python -m local_coding_copilot.evaluation

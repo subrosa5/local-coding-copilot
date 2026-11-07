@@ -4,22 +4,36 @@ import json
 import os
 from pathlib import Path
 
-from local_coding_copilot.bootstrap import build_rag_service
+from local_coding_copilot.auth import Principal
+from local_coding_copilot.bootstrap import build_application
 from local_coding_copilot.judge import LLMJudge
 from local_coding_copilot.models import ChatRequest, Message
 from local_coding_copilot.providers import FakeLLMProvider
 from local_coding_copilot.rag import DocumentRAGService
+from local_coding_copilot.settings import api_token
 
 
 def evaluate_documents(
-    service: DocumentRAGService, baseline_llm: FakeLLMProvider, cases: list[dict]
+    service: DocumentRAGService,
+    baseline_llm: FakeLLMProvider,
+    cases: list[dict],
+    *,
+    principal: Principal,
+    project_id: str = "default",
 ) -> dict:
     results = []
     for case in cases:
         baseline = baseline_llm.complete(
             ChatRequest(messages=(Message(role="user", content=case["question"]),))
         ).content
-        response = service.query(case["question"], limit=5, mode="grounded")
+        response = service.query(
+            case["question"],
+            limit=5,
+            mode="grounded",
+            principal=principal,
+            project_id=project_id,
+            transport="evaluation",
+        )
         expected_sources = set(case["expected_sources"])
         citation_sources = {citation.source for citation in response.citations}
         retrieval_sources = {item.source for item in response.retrieval}
@@ -106,15 +120,23 @@ def main() -> int:
     parser.add_argument(
         "--output", type=Path, default=Path("data/runtime/m3-evaluation.json")
     )
+    parser.add_argument("--project-id", default="default")
     args = parser.parse_args()
 
     dataset_bytes = args.dataset.read_bytes()
     cases = json.loads(dataset_bytes)
-    service = build_rag_service()
+    application = build_application()
+    principal = application.auth.authenticate(api_token())
     baseline = FakeLLMProvider(
         response="Fake model received the retrieved context.", cite_sources=True
     )
-    report = evaluate_documents(service, baseline, cases)
+    report = evaluate_documents(
+        application.service,
+        baseline,
+        cases,
+        principal=principal,
+        project_id=args.project_id,
+    )
     report["dataset_sha256"] = hashlib.sha256(dataset_bytes).hexdigest()
     report["commit"] = os.environ.get("GITHUB_SHA", "local")
     report["provider"] = "deterministic_fake"

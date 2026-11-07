@@ -1,6 +1,6 @@
 # Эксплуатация
 
-**Текущее состояние:** document RAG работает с PostgreSQL/pgvector, fake embeddings и fake LLM. Доступны ingestion CLI, HTTP и MCP. Авторизации нет: используйте только loopback и синтетические документы.
+**Текущее состояние:** document RAG работает с PostgreSQL/pgvector, fake embeddings и fake LLM. Доступны ingestion CLI, HTTP и MCP. Все операции с документами требуют локальный токен и project membership; ingestion разрешён только admin. Используйте только loopback/stdio и синтетические документы.
 
 ## Установка и запуск
 
@@ -12,16 +12,36 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 docker compose up -d db
 export DATABASE_URL=postgresql://copilot:copilot@127.0.0.1:5432/copilot
+```
+
+Создайте первого admin для проекта `default`. Команда один раз печатает случайный plaintext token; в PostgreSQL сохраняется только его SHA-256:
+
+```bash
+export COPILOT_API_TOKEN=$(python -m local_coding_copilot.security_cli \
+  --user-id admin --role admin --project-id default)
 python -m local_coding_copilot.rag_cli ingest data/synthetic
 python -m local_coding_copilot.smoke
 ```
 
-Запрос через CLI в grounded-режиме (по умолчанию) или fast:
+Для тестировщика с доступом только на чтение:
+
+```bash
+python -m local_coding_copilot.security_cli \
+  --user-id tester-1 --role viewer --project-id default
+```
+
+Передайте тестировщику выданный token по отдельному защищённому каналу. Он задаётся как `COPILOT_API_TOKEN` для CLI/MCP или как Bearer token для HTTP. Повторный запуск `security_cli` для того же пользователя создаёт новый token и добавляет указанные project memberships; существующие memberships не удаляются.
+
+## Запросы
+
+CLI в grounded-режиме (по умолчанию) или fast:
 
 ```bash
 python -m local_coding_copilot.rag_cli query "What is the maximum order notional?"
 python -m local_coding_copilot.rag_cli query "Unknown question" --mode fast
 ```
+
+Для другого доступного проекта добавьте `--project-id PROJECT`. Этот аргумент выбирает проект, но не предоставляет прав: membership проверяется по токену.
 
 Grounded требует существующие citations и проверяет числа по процитированному тексту. При отсутствии релевантных источников оба режима возвращают `refused=true` с машинным `refusal_reason`.
 
@@ -31,19 +51,28 @@ HTTP на `127.0.0.1:8000`:
 python -m local_coding_copilot.api
 curl http://127.0.0.1:8000/health
 curl -X POST http://127.0.0.1:8000/v1/query \
+  -H "Authorization: Bearer $COPILOT_API_TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"question":"When is a market data update stale?","limit":3}'
+  -d '{"question":"When is a market data update stale?","limit":3,"project_id":"default"}'
 ```
 
-MCP stdio server запускается клиентом командой:
+Отсутствующий или неверный token возвращает 401, запрет проекта или роли — 403, превышение лимита — 429. `/health` остаётся публичным и не раскрывает данные.
+
+MCP stdio server запускается клиентом командой с `DATABASE_URL` и `COPILOT_API_TOKEN` в окружении:
 
 ```bash
 python -m local_coding_copilot.mcp_server
 ```
 
-Инструмент `query_documents` принимает `question`, опциональные `limit` и `mode`. HTTP принимает те же поля. HTTP и MCP вызывают один `DocumentRAGService`.
+Инструмент `query_documents` принимает `question`, опциональные `limit`, `mode` и `project_id`. Token не передаётся аргументом tool call. HTTP и MCP вызывают один application service и одни проверки ACL.
 
 Остановить БД: `docker compose stop db`. Данные сохраняются в Docker volume `copilot-postgres`.
+
+## Rate limits и audit
+
+В POC действует in-memory sliding window: 60 запросов на пользователя за 60 секунд. Лимит применяется после аутентификации и до embeddings/retrieval. Он отдельный для каждого процесса, сбрасывается при перезапуске и не является distributed production-лимитом.
+
+`audit_events` фиксирует пользователя, проект, действие, transport, outcome, причину отказа, timestamp и небольшие технические metadata. Успешные и отклонённые запросы, denied ACL/role/rate-limit и ingestion записываются для известного principal. Полные вопросы, prompt, ответы, содержимое документов и tokens туда не записываются.
 
 ## Проверки разработки
 
@@ -57,7 +86,7 @@ python -m local_coding_copilot.evaluation
 
 Evaluation сохраняет `data/runtime/m3-evaluation.json`, сравнивает baseline и grounded RAG на одном SHA-256 dataset и проверяет recall@5, correct refusal и false refusal rate. CI сохраняет отчёт как artifact для каждой версии Python.
 
-Без `DATABASE_URL` PostgreSQL/MCP integration-тесты пропускаются. В CI они выполняются с реальным pgvector на Python 3.11 и 3.13. Внешние AI API не используются.
+Без `DATABASE_URL` PostgreSQL/MCP integration-тесты пропускаются. В CI они выполняются с реальным pgvector на Python 3.11 и 3.13, включая cross-project ACL, HTTP, MCP, rate-limit и audit-сценарии. Внешние AI API не используются.
 
 ## Будущая локальная конфигурация
 
@@ -78,4 +107,4 @@ Evaluation сохраняет `data/runtime/m3-evaluation.json`, сравнив�
 
 ## Эксплуатационные ограничения POC
 
-Один ПК является single point of failure. Данные о нагрузке, задержках и стабильности публикуются только после реальных измерений. Нельзя использовать предполагаемые показатели как production SLO.
+Один ПК является single point of failure. Нет SSO, MFA, token expiration, удобного revocation workflow и distributed rate limiting. Данные о нагрузке, задержках и стабильности публикуются только после реальных измерений. Нельзя использовать предполагаемые показатели как production SLO.

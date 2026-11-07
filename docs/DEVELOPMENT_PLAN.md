@@ -54,7 +54,7 @@
 
 ## M4 — Auth, ACL и security baseline
 
-**Статус:** todo.
+**Статус:** done.
 
 - Локальные пользователи, tokens, роли и проектные ACL.
 - Rate limits, audit и секретные/личные данные вне логов.

@@ -1,10 +1,11 @@
 import argparse
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
-from local_coding_copilot.bootstrap import build_rag_service
+from local_coding_copilot.bootstrap import build_application
 from local_coding_copilot.ingestion import load_markdown_documents
+from local_coding_copilot.settings import api_token
 
 
 def main() -> int:
@@ -13,24 +14,38 @@ def main() -> int:
 
     ingest = commands.add_parser("ingest")
     ingest.add_argument("directory", type=Path)
+    ingest.add_argument("--project-id", default="default")
 
     query = commands.add_parser("query")
     query.add_argument("question")
     query.add_argument("--limit", type=int, default=5)
     query.add_argument("--mode", choices=("fast", "grounded"), default="grounded")
+    query.add_argument("--project-id", default="default")
 
     args = parser.parse_args()
-    service = build_rag_service()
+    application = build_application()
+    principal = application.auth.authenticate(api_token())
 
     if args.command == "ingest":
         documents = load_markdown_documents(args.directory)
         for document in documents:
-            count = service.ingest_document(document)
+            count = application.service.ingest_document(
+                replace(document, project_id=args.project_id),
+                principal=principal,
+                transport="cli",
+            )
             print(f"Indexed {document.source}: {count} chunks")
         print(f"Indexed {len(documents)} documents")
         return 0
 
-    response = service.query(args.question, args.limit, args.mode)
+    response = application.service.query(
+        args.question,
+        args.limit,
+        args.mode,
+        principal=principal,
+        project_id=args.project_id,
+        transport="cli",
+    )
     print(json.dumps(asdict(response), ensure_ascii=False, indent=2))
     return 0
 

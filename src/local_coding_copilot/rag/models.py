@@ -10,6 +10,7 @@ class Document:
     source: str
     version: str
     content: str
+    project_id: str = "default"
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +23,7 @@ class Chunk:
     start_line: int
     end_line: int
     content: str
+    project_id: str = "default"
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +43,7 @@ class Citation:
     start_line: int
     end_line: int
     text: str
+    project_id: str = "default"
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +54,7 @@ class RetrievalTraceItem:
     vector_score: float
     lexical_score: float
     selected: bool
+    project_id: str = "default"
 
 
 @dataclass(frozen=True, slots=True)
