@@ -2,7 +2,7 @@
 
 Локальный coding-ассистент с доказательными ответами, RAG по исходному коду, tool calling и изолированным выполнением тестов.
 
-**Статус:** document RAG поддерживает fast/grounded режимы, проверку citations и явный отказ. Добавлены 30 golden-кейсов и baseline/RAG evaluation. Реализованы локальные токены, роли, проектные ACL, rate limits и технический audit. Пока используются fake embeddings/LLM; code RAG, sandbox и реальные модели ещё не реализованы.
+**Статус:** document RAG поддерживает fast/grounded режимы, проверку citations и явный отказ. Добавлены 30 golden-кейсов и baseline/RAG evaluation. Реализованы локальные токены, роли, проектные ACL, rate limits и технический audit. Code RAG индексирует tracked Python-файлы через Git и Tree-sitter, поддерживает exact/hybrid search, AST metadata, commit-aware citations и incremental updates. Пока используются fake embeddings/LLM; sandbox и реальные модели ещё не реализованы.
 
 ## Цель
 
@@ -57,6 +57,15 @@ python -m local_coding_copilot.evaluation
 python -m local_coding_copilot.rag_cli query "What is the maximum order notional?"
 ```
 
+Для code RAG нужен чистый checkout синтетического репозитория:
+
+```bash
+git clone https://github.com/subrosa5/exchange-demo ../exchange-demo
+python -m local_coding_copilot.code_cli index ../exchange-demo \
+  --repository exchange-demo
+python -m local_coding_copilot.code_cli query "validate_order"
+```
+
 HTTP: `python -m local_coding_copilot.api`. MCP stdio: `python -m local_coding_copilot.mcp_server`. Оба используют тот же токен и project ACL. Подробности в [runbook](docs/RUNBOOK.md).
 
 ## Проверки
@@ -72,9 +81,9 @@ pytest
 ## Связанные репозитории
 
 - `local-coding-copilot` — новая система и её документация.
-- `exchange-demo` — будет создан позже как синтетическая цель для code RAG и coding-задач.
+- [`exchange-demo`](https://github.com/subrosa5/exchange-demo) — отдельный синтетический Git-репозиторий с документацией, тестами и тремя известными дефектами.
 - `rag-mcp-agent` — прежний проект; из него переносятся только проверенные изменения отдельными задачами.
 
 ## Текущий этап
 
-**M0–M4** завершены: локальные пользователи, tokens, проектные ACL, rate limits, audit и security-тесты проверены в CI с PostgreSQL/pgvector. Следующий этап — **M5**: code RAG и синтетический `exchange-demo`. Версия предназначена только для loopback/stdio с синтетическими документами.
+**M0–M4** завершены, **M5** находится в работе: code RAG, AST metadata, commit-aware citations и incremental indexing. Версия предназначена только для loopback/stdio с синтетическими документами и кодом.

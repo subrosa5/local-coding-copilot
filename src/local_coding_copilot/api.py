@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from local_coding_copilot.auth import AuthenticationError, AuthorizationError
 from local_coding_copilot.bootstrap import Application, build_application
-from local_coding_copilot.rag import QueryResponse
+from local_coding_copilot.rag import DocumentRAGService, QueryResponse
 from local_coding_copilot.rate_limit import RateLimitExceeded
 
 
@@ -30,30 +30,48 @@ def create_app(application: Application) -> FastAPI:
         request: QueryRequest,
         authorization: Annotated[str | None, Header()] = None,
     ) -> QueryResponse:
-        try:
-            principal = application.auth.authenticate(_bearer_token(authorization))
-            return application.service.query(
-                request.question,
-                request.limit,
-                request.mode,
-                principal=principal,
-                project_id=request.project_id,
-                transport="http",
-            )
-        except AuthenticationError as error:
-            raise HTTPException(
-                status_code=401,
-                detail=str(error),
-                headers={"WWW-Authenticate": "Bearer"},
-            ) from error
-        except AuthorizationError as error:
-            raise HTTPException(status_code=403, detail=str(error)) from error
-        except RateLimitExceeded as error:
-            raise HTTPException(status_code=429, detail=str(error)) from error
-        except ValueError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
+        return _execute_query(application, application.service, request, authorization)
+
+    @app.post("/v1/code/query")
+    def code_query(
+        request: QueryRequest,
+        authorization: Annotated[str | None, Header()] = None,
+    ) -> QueryResponse:
+        return _execute_query(
+            application, application.code_service, request, authorization
+        )
 
     return app
+
+
+def _execute_query(
+    application: Application,
+    service: DocumentRAGService,
+    request: QueryRequest,
+    authorization: str | None,
+) -> QueryResponse:
+    try:
+        principal = application.auth.authenticate(_bearer_token(authorization))
+        return service.query(
+            request.question,
+            request.limit,
+            request.mode,
+            principal=principal,
+            project_id=request.project_id,
+            transport="http",
+        )
+    except AuthenticationError as error:
+        raise HTTPException(
+            status_code=401,
+            detail=str(error),
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from error
+    except AuthorizationError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
+    except RateLimitExceeded as error:
+        raise HTTPException(status_code=429, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 def _bearer_token(authorization: str | None) -> str:

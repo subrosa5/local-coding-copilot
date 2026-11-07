@@ -43,7 +43,7 @@ POC не должен зависеть от конкретного облачн�
 
 Document RAG использует PostgreSQL full-text и pgvector candidates, объединённые через Reciprocal Rank Fusion. SQL CTE `visible_chunks` ограничивает chunks membership пользователя и выбранным проектом до обоих candidate generators. Повторная индексация атомарно заменяет документ и его chunks. Внутренний document ID имеет namespace проекта, поэтому одинаковые пути разных проектов не перезаписывают друг друга. Ответ содержит `source:start_line-end_line@version`, project ID и retrieval trace со vector/lexical scores.
 
-Для code RAG в M5 дополнительно планируются `ripgrep`, Tree-sitter, AST metadata и commit-aware citations. Reranker provider пока не подключён к document pipeline.
+Code RAG индексирует только tracked Python-файлы чистого Git checkout. Tree-sitter извлекает классы, функции и методы с qualified symbol names и line ranges. PostgreSQL выполняет exact path/symbol/content search, full-text и pgvector retrieval с RRF; ACL действует до candidate generation. Citations содержат repository, path, symbol, lines и commit SHA. Incremental indexer сравнивает SHA-256 содержимого, заменяет только изменённые файлы, удаляет исчезнувшие и обновляет commit metadata без повторной векторизации неизменённых файлов. Reranker provider пока не подключён.
 
 Текущая document-запись содержит:
 
@@ -52,7 +52,7 @@ project_id/document_id/source/version/chunk_id
 start_line/end_line/content/embedding
 ```
 
-Repository, symbol и commit metadata будут добавлены вместе с соответствующими этапами.
+Code chunks дополнительно содержат `repository/path/content_sha256/symbol/symbol_kind/commit_sha`; таблица `code_repositories` фиксирует последний полностью проиндексированный commit.
 
 ### Orchestrator
 

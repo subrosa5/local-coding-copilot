@@ -64,7 +64,7 @@
 
 ## M5 — Code RAG и `exchange-demo`
 
-**Статус:** todo.
+**Статус:** in_progress.
 
 - Создать синтетический `exchange-demo` с документацией, тестами и известными дефектами.
 - Tree-sitter, exact search, AST metadata и commit-aware citations.

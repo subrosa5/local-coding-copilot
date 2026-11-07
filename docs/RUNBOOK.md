@@ -68,6 +68,25 @@ python -m local_coding_copilot.mcp_server
 
 Остановить БД: `docker compose stop db`. Данные сохраняются в Docker volume `copilot-postgres`.
 
+## Code RAG
+
+Клонируйте отдельный синтетический репозиторий и убедитесь, что его worktree чистый. Индексатор читает только tracked `.py` файлы и отклоняет незакоммиченные изменения, чтобы commit citation соответствовал содержимому:
+
+```bash
+git clone https://github.com/subrosa5/exchange-demo ../exchange-demo
+git -C ../exchange-demo status --short
+python -m local_coding_copilot.code_cli index ../exchange-demo \
+  --repository exchange-demo --project-id default
+python -m local_coding_copilot.code_cli query "validate_order" \
+  --project-id default
+```
+
+Повторный `index` после нового commit сравнивает content hashes, переиндексирует только изменённые пути и удаляет chunks удалённых файлов. Ответ содержит `repository`, `source` (path), `symbol`, `symbol_kind`, line range, `commit_sha` и те же grounding/refusal поля, что document RAG. Изменение неизменённого файла не требует нового embedding, но его commit metadata обновляется на текущий проиндексированный SHA.
+
+HTTP endpoint: `POST /v1/code/query` с тем же Bearer auth и JSON, что `/v1/query`. MCP tool: `query_code`. Оба используют общий code service и project ACL. Indexing требует admin; viewer может только искать в своих проектах.
+
+В M5 поддерживается Python. Другие языки, очередь фоновой индексации, большие monorepo и reranker не входят в текущий gate.
+
 ## Rate limits и audit
 
 В POC действует in-memory sliding window: 60 запросов на пользователя за 60 секунд. Лимит применяется после аутентификации и до embeddings/retrieval. Он отдельный для каждого процесса, сбрасывается при перезапуске и не является distributed production-лимитом.

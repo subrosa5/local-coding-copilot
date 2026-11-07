@@ -117,6 +117,10 @@ class DocumentRAGService:
                 lexical_score=result.lexical_score,
                 selected=result.chunk.chunk_id in selected_ids,
                 project_id=result.chunk.project_id,
+                repository=result.chunk.repository,
+                symbol=result.chunk.symbol,
+                symbol_kind=result.chunk.symbol_kind,
+                commit_sha=result.chunk.commit_sha,
             )
             for result in candidates
         )
@@ -263,4 +267,8 @@ class DocumentRAGService:
             end_line=chunk.end_line,
             text=chunk.content,
             project_id=chunk.project_id,
+            repository=chunk.repository,
+            symbol=chunk.symbol,
+            symbol_kind=chunk.symbol_kind,
+            commit_sha=chunk.commit_sha,
         )
