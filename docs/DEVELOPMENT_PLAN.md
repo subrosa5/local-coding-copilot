@@ -74,9 +74,9 @@
 
 ## M6 — Coding loop и sandbox
 
-**Статус:** in_progress.
+**Статус:** done.
 
-- Git worktree, unified diff, build/test/lint.
+- Git worktree, unified diff, compileall и unittest.
 - Sandbox без сети и секретов, resource limits и timeout.
 - Не более двух repair iterations.
 - Review diff и обязательное human approval.

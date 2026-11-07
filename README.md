@@ -86,4 +86,4 @@ pytest
 
 ## Текущий этап
 
-**M0–M5** завершены: document/code RAG, ACL, security baseline, AST metadata, commit-aware citations и incremental indexing проверены в CI. Активный этап — **M6**: deterministic coding loop, Git worktree и Docker sandbox проходят финальный CI gate. Версия предназначена только для синтетических документов и кода.
+**M0–M6** завершены: document/code RAG, ACL, security baseline, AST metadata, commit-aware citations, incremental indexing, deterministic coding loop, Git worktree и Docker sandbox проверены в CI. Следующий этап — **M7**: реальные локальные модели, целевой GPU и offline validation. Версия предназначена только для синтетических документов и кода.
