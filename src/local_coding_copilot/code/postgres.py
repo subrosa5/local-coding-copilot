@@ -12,9 +12,13 @@ CREATE TABLE IF NOT EXISTS code_repositories (
     project_id TEXT NOT NULL,
     repository TEXT NOT NULL,
     commit_sha TEXT NOT NULL,
+    embedding_fingerprint TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (project_id, repository)
 );
+
+ALTER TABLE code_repositories
+    ADD COLUMN IF NOT EXISTS embedding_fingerprint TEXT;
 
 CREATE TABLE IF NOT EXISTS code_chunks (
     chunk_id TEXT PRIMARY KEY,
@@ -167,6 +171,57 @@ class PostgresCodeRepository:
             ).fetchone()
         return row[0] if row else None
 
+    def current_embedding_fingerprint(
+        self, project_id: str, repository: str
+    ) -> str | None:
+        with psycopg.connect(self._dsn) as connection:
+            row = connection.execute(
+                """
+                SELECT embedding_fingerprint FROM code_repositories
+                WHERE project_id = %s AND repository = %s
+                """,
+                (project_id, repository),
+            ).fetchone()
+        return row[0] if row else None
+
+    def assert_embedding_fingerprint(
+        self, project_id: str, embedding_fingerprint: str
+    ) -> None:
+        from local_coding_copilot.rag.repository import EmbeddingFingerprintMismatch
+
+        with psycopg.connect(self._dsn) as connection:
+            has_mismatch = connection.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM code_repositories
+                WHERE project_id = %s
+                    AND embedding_fingerprint IS DISTINCT FROM %s
+                    LIMIT 1
+                )
+                """,
+                (project_id, embedding_fingerprint),
+            ).fetchone()[0]
+            has_unregistered = connection.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                FROM code_chunks AS chunks
+                LEFT JOIN code_repositories AS repositories
+                    USING (project_id, repository)
+                WHERE chunks.project_id = %s
+                    AND repositories.project_id IS NULL
+                    LIMIT 1
+                )
+                """,
+                (project_id,),
+            ).fetchone()[0]
+        if has_mismatch or has_unregistered:
+            raise EmbeddingFingerprintMismatch(
+                f"Code index for project {project_id!r} uses a different or "
+                "unknown embedding model; re-index all project repositories before "
+                "querying"
+            )
+
     def apply_changes(
         self,
         project_id: str,
@@ -174,6 +229,7 @@ class PostgresCodeRepository:
         commit_sha: str,
         chunks: Sequence[CodeChunk],
         embeddings: Sequence[Sequence[float]],
+        embedding_fingerprint: str,
         changed_paths: Sequence[str],
         deleted_paths: Sequence[str],
     ) -> None:
@@ -225,12 +281,15 @@ class PostgresCodeRepository:
             )
             cursor.execute(
                 """
-                INSERT INTO code_repositories (project_id, repository, commit_sha)
-                VALUES (%s, %s, %s)
+                INSERT INTO code_repositories (
+                    project_id, repository, commit_sha, embedding_fingerprint
+                ) VALUES (%s, %s, %s, %s)
                 ON CONFLICT (project_id, repository) DO UPDATE
-                SET commit_sha = EXCLUDED.commit_sha, updated_at = now()
+                SET commit_sha = EXCLUDED.commit_sha,
+                    embedding_fingerprint = EXCLUDED.embedding_fingerprint,
+                    updated_at = now()
                 """,
-                (project_id, repository, commit_sha),
+                (project_id, repository, commit_sha, embedding_fingerprint),
             )
 
     def search(

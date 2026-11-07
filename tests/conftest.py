@@ -12,6 +12,7 @@ from local_coding_copilot.rag.models import Chunk, Document, SearchResult
 class InMemoryDocumentRepository:
     def __init__(self) -> None:
         self._chunks: dict[str, Chunk] = {}
+        self._fingerprints: dict[str, str] = {}
         self.audit_events: list[dict[str, object]] = []
 
     def replace_document(
@@ -19,13 +20,51 @@ class InMemoryDocumentRepository:
         document: Document,
         chunks: Sequence[Chunk],
         embeddings: Sequence[Sequence[float]],
+        embedding_fingerprint: str,
     ) -> None:
         self._chunks = {
             chunk_id: chunk
             for chunk_id, chunk in self._chunks.items()
             if chunk.document_id != document.document_id
         }
+        self._fingerprints = {
+            chunk_id: fingerprint
+            for chunk_id, fingerprint in self._fingerprints.items()
+            if chunk_id in self._chunks
+        }
         self._chunks.update((chunk.chunk_id, chunk) for chunk in chunks)
+        self._fingerprints.update(
+            (chunk.chunk_id, embedding_fingerprint) for chunk in chunks
+        )
+
+    def assert_embedding_fingerprint(self, project_id: str, fingerprint: str) -> None:
+        from local_coding_copilot.rag.repository import EmbeddingFingerprintMismatch
+
+        if any(
+            chunk.project_id == project_id
+            and self._fingerprints.get(chunk_id) != fingerprint
+            for chunk_id, chunk in self._chunks.items()
+        ):
+            raise EmbeddingFingerprintMismatch("Embedding model fingerprint mismatch")
+
+    def delete_documents_except(self, project_id: str, document_ids) -> int:
+        keep = set(document_ids)
+        removed_documents = {
+            chunk.document_id
+            for chunk in self._chunks.values()
+            if chunk.project_id == project_id and chunk.document_id not in keep
+        }
+        self._chunks = {
+            chunk_id: chunk
+            for chunk_id, chunk in self._chunks.items()
+            if chunk.document_id not in removed_documents
+        }
+        self._fingerprints = {
+            chunk_id: fingerprint
+            for chunk_id, fingerprint in self._fingerprints.items()
+            if chunk_id in self._chunks
+        }
+        return len(removed_documents)
 
     def search(
         self,

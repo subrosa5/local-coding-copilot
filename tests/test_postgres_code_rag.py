@@ -19,6 +19,8 @@ from local_coding_copilot.bootstrap import (
 )
 from local_coding_copilot.code.indexer import GitCodeIndexer
 from local_coding_copilot.code.postgres import PostgresCodeRepository
+from local_coding_copilot.providers import FakeEmbeddingProvider
+from local_coding_copilot.rag.repository import EmbeddingFingerprintMismatch
 
 
 @dataclass(frozen=True)
@@ -114,6 +116,16 @@ def test_symbol_search_returns_ast_and_commit_metadata(
     assert citation.commit_sha == code_context.initial_commit
     assert citation.version == code_context.initial_commit
     assert response.retrieval[0].lexical_score > 0
+
+
+def test_code_query_rejects_wrong_embedding_fingerprint(
+    code_context: CodeContext,
+) -> None:
+    with pytest.raises(EmbeddingFingerprintMismatch, match="different or unknown"):
+        code_context.repository.assert_embedding_fingerprint(
+            code_context.project_id,
+            FakeEmbeddingProvider(dimension=12).fingerprint,
+        )
 
 
 def test_incremental_postgres_index_updates_and_deletes(

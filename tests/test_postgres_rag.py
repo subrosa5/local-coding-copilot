@@ -11,6 +11,8 @@ from local_coding_copilot.api import create_app
 from local_coding_copilot.auth import Principal
 from local_coding_copilot.bootstrap import Application, build_application
 from local_coding_copilot.ingestion import load_markdown_documents
+from local_coding_copilot.rag.postgres import PostgresDocumentRepository
+from local_coding_copilot.rag.repository import EmbeddingFingerprintMismatch
 
 
 @pytest.fixture(scope="module")
@@ -55,6 +57,15 @@ def test_postgres_hybrid_retrieval(postgres_service, postgres_principal) -> None
     assert "maximum notional value" in response.citations[0].text
     assert response.retrieval[0].lexical_score > 0
     assert len(response.citations[0].version) == 64
+
+
+def test_postgres_document_index_rejects_mixed_embedding_fingerprints(
+    postgres_service,
+) -> None:
+    repository = PostgresDocumentRepository(os.environ["DATABASE_URL"])
+
+    with pytest.raises(EmbeddingFingerprintMismatch, match="different or unknown"):
+        repository.assert_embedding_fingerprint("default", "sha256:" + "0" * 64)
 
 
 def test_http_with_postgres(

@@ -38,11 +38,18 @@ CREATE TABLE IF NOT EXISTS rag_documents (
     source TEXT NOT NULL,
     version TEXT NOT NULL,
     content TEXT NOT NULL,
+    embedding_fingerprint TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 ALTER TABLE rag_documents
     ADD COLUMN IF NOT EXISTS project_id TEXT NOT NULL DEFAULT 'default';
+
+ALTER TABLE rag_documents
+    ADD COLUMN IF NOT EXISTS embedding_fingerprint TEXT;
+
+CREATE INDEX IF NOT EXISTS rag_documents_project_embedding_idx
+    ON rag_documents (project_id, embedding_fingerprint);
 
 CREATE TABLE IF NOT EXISTS rag_chunks (
     chunk_id TEXT PRIMARY KEY,
@@ -151,6 +158,7 @@ class PostgresDocumentRepository:
         document: Document,
         chunks: Sequence[Chunk],
         embeddings: Sequence[Sequence[float]],
+        embedding_fingerprint: str,
     ) -> None:
         if len(chunks) != len(embeddings):
             raise ValueError("Each chunk must have exactly one embedding")
@@ -163,8 +171,9 @@ class PostgresDocumentRepository:
             cursor.execute(
                 """
                 INSERT INTO rag_documents (
-                    document_id, project_id, source, version, content
-                ) VALUES (%s, %s, %s, %s, %s)
+                    document_id, project_id, source, version, content,
+                    embedding_fingerprint
+                ) VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     document.document_id,
@@ -172,6 +181,7 @@ class PostgresDocumentRepository:
                     document.source,
                     document.version,
                     document.content,
+                    embedding_fingerprint,
                 ),
             )
             for chunk, embedding in zip(chunks, embeddings, strict=True):
@@ -192,6 +202,42 @@ class PostgresDocumentRepository:
                         _vector_literal(embedding),
                     ),
                 )
+
+    def assert_embedding_fingerprint(
+        self, project_id: str, embedding_fingerprint: str
+    ) -> None:
+        from local_coding_copilot.rag.repository import EmbeddingFingerprintMismatch
+
+        with psycopg.connect(self._dsn) as connection:
+            has_mismatch = connection.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM rag_documents
+                WHERE project_id = %s
+                    AND embedding_fingerprint IS DISTINCT FROM %s
+                    LIMIT 1
+                )
+                """,
+                (project_id, embedding_fingerprint),
+            ).fetchone()[0]
+        if has_mismatch:
+            raise EmbeddingFingerprintMismatch(
+                f"Documents in project {project_id!r} use a different or unknown "
+                "embedding model; re-ingest the full project before querying"
+            )
+
+    def delete_documents_except(
+        self, project_id: str, document_ids: Sequence[str]
+    ) -> int:
+        with psycopg.connect(self._dsn) as connection:
+            cursor = connection.execute(
+                """
+                DELETE FROM rag_documents
+                WHERE project_id = %s AND NOT (document_id = ANY(%s))
+                """,
+                (project_id, list(document_ids)),
+            )
+            return cursor.rowcount
 
     def search(
         self,

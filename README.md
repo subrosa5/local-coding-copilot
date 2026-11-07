@@ -2,7 +2,7 @@
 
 Локальный coding-ассистент с доказательными ответами, RAG по исходному коду, tool calling и изолированным выполнением тестов.
 
-**Статус:** document RAG поддерживает fast/grounded режимы, проверку citations и явный отказ. Добавлены 30 golden-кейсов и baseline/RAG evaluation. Реализованы локальные токены, роли, проектные ACL, rate limits и технический audit. Code RAG индексирует tracked Python-файлы через Git и Tree-sitter, поддерживает exact/hybrid search, AST metadata, commit-aware citations и incremental updates. Пока используются fake embeddings/LLM; sandbox и реальные модели ещё не реализованы.
+**Статус:** document RAG поддерживает fast/grounded режимы, проверку citations и явный отказ. Добавлены 30 golden-кейсов и baseline/RAG evaluation. Реализованы локальные токены, роли, проектные ACL, rate limits и технический audit. Code RAG индексирует tracked Python-файлы через Git и Tree-sitter, поддерживает exact/hybrid search, AST metadata, commit-aware citations и incremental updates. По умолчанию используются fake providers; добавлены опциональные локальные embedding/reranker providers и offline preflight. Локальная LLM, sandbox и запуск реальных моделей на целевом ПК ещё не проверены.
 
 ## Цель
 
@@ -33,6 +33,7 @@
 - [План разработки и перенос старого кода](docs/DEVELOPMENT_PLAN.md)
 - [Безопасность](docs/SECURITY.md)
 - [Оценка качества](docs/EVALUATION.md)
+- [Локальные модели и preflight](docs/LOCAL_MODELS.md)
 - [Руководство тестировщика](docs/TESTER_GUIDE.md)
 - [Эксплуатация](docs/RUNBOOK.md)
 - [Отличия POC от production](docs/PRODUCTION_GAP.md)
@@ -86,4 +87,4 @@ pytest
 
 ## Текущий этап
 
-**M0–M5** завершены: document/code RAG, ACL, security baseline, AST metadata, commit-aware citations и incremental indexing проверены в CI. Следующий этап — **M6**: coding loop, Git worktree и sandbox. Версия предназначена только для синтетических документов и кода.
+**M0–M5** завершены: document/code RAG, ACL, security baseline, AST metadata, commit-aware citations и incremental indexing проверены в CI. **M6** — coding loop, Git worktree и sandbox; **M7** — локальные модели и offline validation на целевом ПК. Текущая версия предназначена только для синтетических документов и кода.

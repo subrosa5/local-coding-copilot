@@ -45,4 +45,8 @@ def _numbers(text: str) -> set[str]:
 
 
 def _normalize_number(value: str) -> str:
-    return value.replace(",", "")
+    # Accept conventional thousands separators (1,000,000 == 1000000), while
+    # preserving decimal commas (1,5 must never become the unrelated value 15).
+    if re.fullmatch(r"\d{1,3}(?:,\d{3})+", value):
+        return value.replace(",", "")
+    return value

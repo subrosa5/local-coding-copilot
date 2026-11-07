@@ -1,3 +1,4 @@
+import math
 from dataclasses import replace
 
 from local_coding_copilot.auth import (
@@ -6,7 +7,11 @@ from local_coding_copilot.auth import (
     Principal,
 )
 from local_coding_copilot.models import ChatRequest, Message
-from local_coding_copilot.providers import EmbeddingProvider, LLMProvider
+from local_coding_copilot.providers import (
+    EmbeddingProvider,
+    LLMProvider,
+    RerankerProvider,
+)
 from local_coding_copilot.rag.chunking import chunk_document
 from local_coding_copilot.rag.grounding import validate_grounding
 from local_coding_copilot.rag.models import (
@@ -32,6 +37,7 @@ class DocumentRAGService:
         chunk_size: int = 800,
         min_vector_score: float = 0.25,
         rate_limiter: RateLimiter | None = None,
+        reranker: RerankerProvider | None = None,
     ) -> None:
         self._repository = repository
         self._embeddings = embeddings
@@ -39,6 +45,19 @@ class DocumentRAGService:
         self._chunk_size = chunk_size
         self._min_vector_score = min_vector_score
         self._rate_limiter = rate_limiter or RateLimiter()
+        self._reranker = reranker
+
+    @property
+    def embedding_fingerprint(self) -> str:
+        return self._embeddings.fingerprint
+
+    @property
+    def reranker_enabled(self) -> bool:
+        return self._reranker is not None
+
+    @property
+    def reranker_fingerprint(self) -> str | None:
+        return self._reranker.fingerprint if self._reranker is not None else None
 
     def ingest_document(
         self,
@@ -54,7 +73,12 @@ class DocumentRAGService:
         )
         chunks = chunk_document(namespaced_document, max_chars=self._chunk_size)
         embeddings = self._embeddings.embed([chunk.content for chunk in chunks])
-        self._repository.replace_document(namespaced_document, chunks, embeddings)
+        self._repository.replace_document(
+            namespaced_document,
+            chunks,
+            embeddings,
+            self._embeddings.fingerprint,
+        )
         self._audit(
             principal,
             document.project_id,
@@ -64,6 +88,33 @@ class DocumentRAGService:
             metadata={"chunk_count": len(chunks)},
         )
         return len(chunks)
+
+    def prune_project_documents(
+        self,
+        keep_document_ids: set[str],
+        *,
+        principal: Principal | None,
+        project_id: str = "default",
+        transport: str = "internal",
+    ) -> int:
+        self._authorize(
+            principal, project_id, "document_prune", transport, admin_only=True
+        )
+        namespaced_ids = [
+            f"{project_id}:{document_id}" for document_id in sorted(keep_document_ids)
+        ]
+        deleted_count = self._repository.delete_documents_except(
+            project_id, namespaced_ids
+        )
+        self._audit(
+            principal,
+            project_id,
+            "document_prune",
+            transport,
+            "success",
+            metadata={"deleted_document_count": deleted_count},
+        )
+        return deleted_count
 
     def query(
         self,
@@ -96,9 +147,18 @@ class DocumentRAGService:
         if mode not in {"fast", "grounded"}:
             raise ValueError("Mode must be fast or grounded")
 
+        assert_fingerprint = getattr(
+            self._repository, "assert_embedding_fingerprint", None
+        )
+        if assert_fingerprint is not None:
+            assert_fingerprint(project_id, self._embeddings.fingerprint)
+
         embedding = self._embeddings.embed([question])[0]
+        # Retrieve a larger ACL-filtered candidate set when a reranker is
+        # configured. The repository applies project membership before search.
+        candidate_limit = min(limit * 4, 80) if self._reranker else limit
         candidates = self._repository.search(
-            question, embedding, limit, principal.user_id, project_id
+            question, embedding, candidate_limit, principal.user_id, project_id
         )
         selected_ids = {
             result.chunk.chunk_id
@@ -108,6 +168,33 @@ class DocumentRAGService:
         results = [
             result for result in candidates if result.chunk.chunk_id in selected_ids
         ]
+        reranker_scores: dict[str, float] = {}
+        if self._reranker and results:
+            reranked = self._reranker.rerank(
+                question, [result.chunk.content for result in results]
+            )
+            indexes = [item.index for item in reranked]
+            if (
+                len(indexes) != len(results)
+                or set(indexes) != set(range(len(results)))
+                or any(not math.isfinite(item.score) for item in reranked)
+            ):
+                raise ValueError("Reranker returned invalid result indexes or scores")
+            reranker_scores = {
+                results[item.index].chunk.chunk_id: item.score for item in reranked
+            }
+            reranked_candidates = [results[item.index] for item in reranked]
+            results = reranked_candidates[:limit]
+            reranked_ids = {result.chunk.chunk_id for result in reranked_candidates}
+            trace_candidates = reranked_candidates + [
+                result
+                for result in candidates
+                if result.chunk.chunk_id not in reranked_ids
+            ]
+        else:
+            results = results[:limit]
+            trace_candidates = candidates
+        selected_ids = {result.chunk.chunk_id for result in results}
         retrieval = tuple(
             RetrievalTraceItem(
                 chunk_id=result.chunk.chunk_id,
@@ -121,8 +208,9 @@ class DocumentRAGService:
                 symbol=result.chunk.symbol,
                 symbol_kind=result.chunk.symbol_kind,
                 commit_sha=result.chunk.commit_sha,
+                reranker_score=reranker_scores.get(result.chunk.chunk_id),
             )
-            for result in candidates
+            for result in trace_candidates
         )
         if not results:
             response = self._refusal(mode, retrieval, "no_relevant_evidence")

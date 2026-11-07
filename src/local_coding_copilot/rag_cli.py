@@ -15,6 +15,11 @@ def main() -> int:
     ingest = commands.add_parser("ingest")
     ingest.add_argument("directory", type=Path)
     ingest.add_argument("--project-id", default="default")
+    ingest.add_argument(
+        "--prune-missing",
+        action="store_true",
+        help="Delete indexed documents absent from this complete project source",
+    )
 
     query = commands.add_parser("query")
     query.add_argument("question")
@@ -28,6 +33,8 @@ def main() -> int:
 
     if args.command == "ingest":
         documents = load_markdown_documents(args.directory)
+        if not documents:
+            raise ValueError(f"No Markdown documents found in {args.directory}")
         for document in documents:
             count = application.service.ingest_document(
                 replace(document, project_id=args.project_id),
@@ -36,6 +43,18 @@ def main() -> int:
             )
             print(f"Indexed {document.source}: {count} chunks")
         print(f"Indexed {len(documents)} documents")
+        if args.prune_missing:
+            deleted = application.service.prune_project_documents(
+                {document.document_id for document in documents},
+                principal=principal,
+                project_id=args.project_id,
+                transport="cli",
+            )
+            print(
+                f"Removed {deleted} documents no longer present in the source directory"
+            )
+        else:
+            print("Kept documents absent from the source directory")
         return 0
 
     response = application.service.query(

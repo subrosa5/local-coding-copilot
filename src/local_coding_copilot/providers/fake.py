@@ -34,6 +34,11 @@ class FakeEmbeddingProvider:
             raise ValueError("Embedding dimension must be positive")
         self._dimension = dimension
 
+    @property
+    def fingerprint(self) -> str:
+        payload = f"fake-v1:{self._dimension}".encode()
+        return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         return [self._embed(text) for text in texts]
 
@@ -47,6 +52,10 @@ class FakeEmbeddingProvider:
 
 
 class FakeRerankerProvider:
+    @property
+    def fingerprint(self) -> str:
+        return "sha256:" + hashlib.sha256(b"fake-reranker-v1").hexdigest()
+
     def rerank(self, query: str, documents: Sequence[str]) -> list[RerankResult]:
         query_tokens = set(query.casefold().split())
         results = []

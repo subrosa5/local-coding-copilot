@@ -38,12 +38,21 @@ def test_grounding_rejects_unsupported_number() -> None:
     assert result.reason == "unsupported_number"
 
 
+def test_grounding_does_not_treat_decimal_comma_as_thousands_separator() -> None:
+    result = validate_grounding(
+        "The rate is 1,5 percent [1].", [make_result("Rate is 15 percent.")]
+    )
+
+    assert result.reason == "unsupported_number"
+
+
 class IrrelevantRepository:
     def replace_document(
         self,
         document: Document,
         chunks: Sequence[Chunk],
         embeddings: Sequence[Sequence[float]],
+        embedding_fingerprint: str,
     ) -> None:
         pass
 
@@ -72,6 +81,9 @@ class IrrelevantRepository:
         reason: str | None = None,
         metadata: dict[str, object] | None = None,
     ) -> None:
+        pass
+
+    def assert_embedding_fingerprint(self, project_id: str, fingerprint: str) -> None:
         pass
 
 

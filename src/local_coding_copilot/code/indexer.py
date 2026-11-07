@@ -48,10 +48,15 @@ class GitCodeIndexer:
             current_hashes[path] = hashlib.sha256(content.encode()).hexdigest()
 
         previous_hashes = self._repository.indexed_files(project_id, repository)
+        current_fingerprint = self._embeddings.fingerprint
+        previous_fingerprint = self._repository.current_embedding_fingerprint(
+            project_id, repository
+        )
+        fingerprint_changed = previous_fingerprint != current_fingerprint
         changed_paths = tuple(
             path
             for path in tracked_paths
-            if previous_hashes.get(path) != current_hashes[path]
+            if fingerprint_changed or previous_hashes.get(path) != current_hashes[path]
         )
         deleted_paths = tuple(sorted(previous_hashes.keys() - current_hashes.keys()))
         chunks = [
@@ -77,6 +82,7 @@ class GitCodeIndexer:
             commit_sha,
             chunks,
             embeddings,
+            current_fingerprint,
             changed_paths,
             deleted_paths,
         )

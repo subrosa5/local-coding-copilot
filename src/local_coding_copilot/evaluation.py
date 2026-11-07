@@ -36,7 +36,7 @@ def evaluate_documents(
         )
         expected_sources = set(case["expected_sources"])
         citation_sources = {citation.source for citation in response.citations}
-        retrieval_sources = {item.source for item in response.retrieval}
+        retrieval_sources = [item.source for item in response.retrieval]
         answerable = case["answerable"]
         baseline_refused = "недостаточно" in baseline.casefold() or "не знаю" in (
             baseline.casefold()
@@ -62,16 +62,35 @@ def evaluate_documents(
                     "refused": response.refused,
                     "refusal_reason": response.refusal_reason,
                     "citation_sources": sorted(citation_sources),
-                    "retrieval_sources": sorted(retrieval_sources),
+                    "retrieval_sources": retrieval_sources,
+                    "retrieval": [
+                        {
+                            "source": item.source,
+                            "hybrid_score": item.score,
+                            "reranker_score": item.reranker_score,
+                            "selected": item.selected,
+                        }
+                        for item in response.retrieval
+                    ],
                     "success": rag_success,
                 },
-                "retrieval_hit": expected_sources <= retrieval_sources,
+                "retrieval_hit": expected_sources <= set(retrieval_sources),
             }
         )
     return {
         "baseline": _summary(results, "baseline"),
         "rag": _summary(results, "rag"),
         "retrieval_recall_at_5": _retrieval_recall(results),
+        "retrieval_ranking": retrieval_ranking_metrics(
+            [
+                {
+                    "answerable": result["answerable"],
+                    "expected_sources": result["expected_sources"],
+                    "retrieval_sources": result["rag"]["retrieval_sources"],
+                }
+                for result in results
+            ]
+        ),
         "cases": results,
     }
 
@@ -92,6 +111,42 @@ def _summary(results: list[dict], configuration: str) -> dict:
 def _retrieval_recall(results: list[dict]) -> float:
     answerable = [result for result in results if result["answerable"]]
     return sum(result["retrieval_hit"] for result in answerable) / len(answerable)
+
+
+def retrieval_ranking_metrics(
+    cases: list[dict], k_values: tuple[int, ...] = (1, 3, 5)
+) -> dict[str, float]:
+    """Compute source-level Recall@k and MRR from ordered retrieval traces."""
+    answerable = [case for case in cases if case["answerable"]]
+    relevant_total = sum(len(set(case["expected_sources"])) for case in answerable)
+    metrics = {
+        f"recall_at_{k}": (
+            sum(
+                len(set(case["expected_sources"]) & set(case["retrieval_sources"][:k]))
+                for case in answerable
+            )
+            / relevant_total
+            if relevant_total
+            else 0.0
+        )
+        for k in k_values
+    }
+    reciprocal_ranks = []
+    for case in answerable:
+        expected = set(case["expected_sources"])
+        rank = next(
+            (
+                index
+                for index, source in enumerate(case["retrieval_sources"][:5], start=1)
+                if source in expected
+            ),
+            None,
+        )
+        reciprocal_ranks.append(1 / rank if rank else 0.0)
+    metrics["mrr_at_5"] = (
+        sum(reciprocal_ranks) / len(reciprocal_ranks) if reciprocal_ranks else 0.0
+    )
+    return metrics
 
 
 def calibrate_judge(samples: list[dict]) -> dict:
@@ -139,7 +194,12 @@ def main() -> int:
     )
     report["dataset_sha256"] = hashlib.sha256(dataset_bytes).hexdigest()
     report["commit"] = os.environ.get("GITHUB_SHA", "local")
-    report["provider"] = "deterministic_fake"
+    report["providers"] = {
+        "embedding_fingerprint": application.service.embedding_fingerprint,
+        "reranker_enabled": application.service.reranker_enabled,
+        "reranker_fingerprint": application.service.reranker_fingerprint,
+        "llm": "deterministic_fake",
+    }
     report["judge_calibration"] = calibrate_judge(
         json.loads(args.judge_samples.read_text(encoding="utf-8"))
     )

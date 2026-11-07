@@ -15,6 +15,7 @@ class InMemoryCodeRepository:
     def __init__(self) -> None:
         self.chunks: dict[str, CodeChunk] = {}
         self.commit: str | None = None
+        self.fingerprint: str | None = None
         self.audit_events: list[dict[str, object]] = []
 
     def indexed_files(self, project_id: str, repository: str) -> dict[str, str]:
@@ -24,6 +25,9 @@ class InMemoryCodeRepository:
             if chunk.project_id == project_id and chunk.repository == repository
         }
 
+    def current_embedding_fingerprint(self, project_id: str, repository: str):
+        return self.fingerprint
+
     def apply_changes(
         self,
         project_id: str,
@@ -31,6 +35,7 @@ class InMemoryCodeRepository:
         commit_sha: str,
         chunks: Sequence[CodeChunk],
         embeddings: Sequence[Sequence[float]],
+        embedding_fingerprint: str,
         changed_paths: Sequence[str],
         deleted_paths: Sequence[str],
     ) -> None:
@@ -46,15 +51,20 @@ class InMemoryCodeRepository:
             for chunk_id, chunk in self.chunks.items()
         }
         self.commit = commit_sha
+        self.fingerprint = embedding_fingerprint
 
     def record_audit(self, *args, **kwargs) -> None:
         self.audit_events.append({"args": args, "kwargs": kwargs})
 
 
 class CountingEmbeddingProvider:
-    def __init__(self) -> None:
+    def __init__(self, provider: FakeEmbeddingProvider | None = None) -> None:
         self.calls = 0
-        self._provider = FakeEmbeddingProvider()
+        self._provider = provider or FakeEmbeddingProvider()
+
+    @property
+    def fingerprint(self) -> str:
+        return self._provider.fingerprint
 
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         self.calls += 1
@@ -128,6 +138,25 @@ def test_incremental_index_updates_changed_and_deleted_files(
     assert {chunk.symbol for chunk in repository.chunks.values()} == {
         "calculate_fee_v2"
     }
+
+
+def test_embedding_model_change_reindexes_every_tracked_file(
+    git_repository: Path, admin_principal: Principal
+) -> None:
+    repository = InMemoryCodeRepository()
+    first_embeddings = CountingEmbeddingProvider(FakeEmbeddingProvider(dimension=8))
+    first_indexer = GitCodeIndexer(repository, first_embeddings)
+    first_indexer.index(git_repository, "demo", "default", principal=admin_principal)
+
+    second_embeddings = CountingEmbeddingProvider(FakeEmbeddingProvider(dimension=12))
+    second_indexer = GitCodeIndexer(repository, second_embeddings)
+    reindexed = second_indexer.index(
+        git_repository, "demo", "default", principal=admin_principal
+    )
+
+    assert reindexed.changed_files == 2
+    assert second_embeddings.calls == 1
+    assert repository.fingerprint == second_embeddings.fingerprint
 
 
 def test_indexer_rejects_dirty_worktree(

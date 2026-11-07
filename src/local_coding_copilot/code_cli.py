@@ -27,7 +27,8 @@ def main() -> int:
     principal = application.auth.authenticate(api_token())
 
     if args.command == "index":
-        result = build_code_indexer().index(
+        indexer = application.code_indexer or build_code_indexer()
+        result = indexer.index(
             args.directory,
             args.repository,
             args.project_id,

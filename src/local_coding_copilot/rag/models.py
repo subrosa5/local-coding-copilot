@@ -67,6 +67,7 @@ class RetrievalTraceItem:
     symbol: str | None = None
     symbol_kind: str | None = None
     commit_sha: str | None = None
+    reranker_score: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

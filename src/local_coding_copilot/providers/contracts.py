@@ -9,8 +9,14 @@ class LLMProvider(Protocol):
 
 
 class EmbeddingProvider(Protocol):
+    @property
+    def fingerprint(self) -> str: ...
+
     def embed(self, texts: Sequence[str]) -> list[list[float]]: ...
 
 
 class RerankerProvider(Protocol):
+    @property
+    def fingerprint(self) -> str: ...
+
     def rerank(self, query: str, documents: Sequence[str]) -> list[RerankResult]: ...

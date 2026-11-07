@@ -8,6 +8,10 @@ from local_coding_copilot.providers.fake import (
     FakeLLMProvider,
     FakeRerankerProvider,
 )
+from local_coding_copilot.providers.sentence_transformers import (
+    SentenceTransformerEmbeddingProvider,
+    SentenceTransformerRerankerProvider,
+)
 
 __all__ = [
     "EmbeddingProvider",
@@ -16,4 +20,6 @@ __all__ = [
     "FakeRerankerProvider",
     "LLMProvider",
     "RerankerProvider",
+    "SentenceTransformerEmbeddingProvider",
+    "SentenceTransformerRerankerProvider",
 ]

@@ -23,6 +23,10 @@ dev = [
     "pytest==8.4.2",
     "ruff==0.14.5",
 ]
+local-models = ["sentence-transformers==6.2.0"]
+
+[project.scripts]
+copilot-model-preflight = "local_coding_copilot.model_preflight:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
