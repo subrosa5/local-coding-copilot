@@ -32,12 +32,12 @@ FastAPI HTTP и MCP stdio вызывают один `Application` с общим�
 
 В `src/local_coding_copilot/providers/contracts.py` определены независимые контракты:
 
-- `LLMProvider` — chat/tool calling; адаптеры внешнего или OpenAI-compatible local endpoint ещё предстоит реализовать;
+- `LLMProvider` — chat/tool-call responses; M7 реализует OpenAI-compatible loopback HTTP adapter. Tool calls сопоставляются с разрешёнными именами и поддерживаемым подмножеством JSON Schema (`type`, `enum`, `required`, `properties`, `additionalProperties`, `items`); неизвестные schema keywords отклоняются. Coding patch path запрещает tool calls и принимает только raw unified diff;
 - `EmbeddingProvider` — embeddings;
 - `RerankerProvider` — reranking;
 - fake implementations — детерминированные CI-тесты без внешних API.
 
-POC не должен зависеть от конкретного облачного провайдера.
+POC не зависит от конкретного inference server и не обращается к облачным endpoint. Provider запрещает non-loopback URL, proxy и redirects. Fake provider остаётся стандартом CI и локального запуска без конфигурации.
 
 ### Retrieval
 
@@ -66,7 +66,7 @@ Document query реализован без дополнительного agent 
 
 Оба режима отказывают при отсутствии релевантных источников. Grounding-проверки не доказывают смысловую истинность каждого утверждения и не являются security boundary. LLM-judge используется только в отдельной calibration harness, не в production answer path.
 
-`CodingOrchestrator` доступен через CLI только admin с membership в проекте. Он делает первую попытку и не более двух repair iterations, получая unified diff через `PatchProvider`. Текущий `StaticPatchProvider` читает заранее подготовленные `.patch` файлы: это deterministic harness для проверки orchestration, а не генерация кода LLM. После compileall и unittest результат `awaiting_review` содержит diff, SHA-256, changed files, признак изменения тестов и технические результаты проверок. Merge API отсутствует.
+`CodingOrchestrator` доступен через CLI только admin с membership в проекте. Он делает первую попытку и не более двух repair iterations, получая unified diff через `PatchProvider`. `StaticPatchProvider` остаётся детерминированным M6 harness, а `ModelPatchProvider` для M7 просит локальную LLM вернуть только raw diff. Patch проходит структурную и path validation, затем `git apply --check` в detached worktree; бинарные изменения, mode changes, traversal, `.git`, symlink paths и add/delete/rename отклоняются. Tool calls отклоняются coding provider и не исполняются. После compileall и unittest результат `awaiting_review` содержит diff, SHA-256, changed files, признак изменения тестов и технические результаты проверок. Merge API отсутствует.
 
 ### Git workspace и sandbox
 

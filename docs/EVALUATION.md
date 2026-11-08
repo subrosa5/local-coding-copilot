@@ -48,6 +48,8 @@ Grounded path дополнительно проверяет существова
 - число repair iterations;
 - доля принятых человеком diff.
 
+На M7 `copilot-coding-evaluation` сравнивает три режима на одном commit и наборе coding-задач: Base (полный ограниченный snapshot tracked Python-файлов из Git, без retrieval и repair), RAG (grounded code citations, без repair) и RAG + test loop (grounded citations, максимум две repair iterations). Все три режима получают исходный код: Base получает snapshot до 24 KiB суммарно, RAG — только выбранные commit-matched citations. `evals/coding_benchmark.json` содержит только task ID и instructions; loader отвергает дополнительные поля и runner не загружает prepared patch files. Отчёт содержит SHA-256 canonical task set, base commit, configured model/endpoint, rates применения patch/build/test, число repairs, длительность, p50/p95 LLM request latency и tokens/sec, если endpoint возвращает usage. `pass_at_1` измеряется для Base/RAG; `success_after_repairs` отдельно отражает RAG + test loop. Human acceptance, VRAM и RAM автоматически не предполагаются и остаются ручными измерениями. Набор мал и синтетический, его результаты не доказывают качество на реальном коде.
+
 ### Производительность
 
 - p50/p95 latency и time to first token;

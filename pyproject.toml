@@ -24,6 +24,9 @@ dev = [
     "ruff==0.14.5",
 ]
 
+[project.scripts]
+copilot-coding-evaluation = "local_coding_copilot.coding_evaluation:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

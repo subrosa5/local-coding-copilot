@@ -2,7 +2,7 @@
 
 Локальный coding-ассистент с доказательными ответами, RAG по исходному коду, tool calling и изолированным выполнением тестов.
 
-**Статус:** document RAG поддерживает fast/grounded режимы, проверку citations и явный отказ. Реализованы локальные токены, роли, проектные ACL, rate limits и технический audit. Code RAG индексирует tracked Python-файлы через Git и Tree-sitter с commit-aware citations и incremental updates. Coding loop применяет подготовленные unified diff в отдельном worktree и запускает compileall/unittest в Docker без сети; успешный patch ожидает ручного review. Сейчас используются fake embeddings/LLM и детерминированный patch provider, реальные модели относятся к M7.
+**Статус:** document RAG поддерживает fast/grounded режимы, проверку citations и явный отказ. Реализованы локальные токены, роли, project ACL, rate limits и технический audit. Code RAG индексирует tracked Python-файлы через Git и Tree-sitter с commit-aware citations и incremental updates. M6 coding loop запускает compileall/unittest в Docker без сети и оставляет diff на human review. На ветке M7 добавлены OpenAI-compatible loopback provider, model-generated diff, проверка patch до `git apply` и benchmark Base/RAG/RAG + test loop. На этой ветке embeddings пока fake; реальная модель, GPU, offline и качество не проверены.
 
 ## Цель
 
@@ -66,6 +66,8 @@ python -m local_coding_copilot.code_cli index ../exchange-demo \
 python -m local_coding_copilot.code_cli query "validate_order"
 ```
 
+Для M7 укажите локальный OpenAI-compatible endpoint в `COPILOT_LLM_BASE_URL` и имя модели в `COPILOT_LLM_MODEL`. Provider принимает только loopback HTTP URL; redirects и системные proxy отключены. Сгенерированный diff ограничен существующими файлами, проверяется до `git apply` и исполняется только через M6 sandbox. См. [runbook](docs/RUNBOOK.md).
+
 HTTP: `python -m local_coding_copilot.api`. MCP stdio: `python -m local_coding_copilot.mcp_server`. Оба используют тот же токен и project ACL. Подробности в [runbook](docs/RUNBOOK.md).
 
 ## Проверки
@@ -86,4 +88,4 @@ pytest
 
 ## Текущий этап
 
-**M0–M6** завершены: document/code RAG, ACL, security baseline, AST metadata, commit-aware citations, incremental indexing, deterministic coding loop, Git worktree и Docker sandbox проверены в CI. Следующий этап — **M7**: реальные локальные модели, целевой GPU и offline validation. Версия предназначена только для синтетических документов и кода.
+**M0–M6** завершены и проверены в CI. **M7** готовит настоящий локальный inference provider, model-based patches и сравнительный coding benchmark; подтверждение на RTX 4070 Ti, замеры VRAM/скорости/качества и offline-проверка остаются обязательными ручными gate на целевом ПК. Используйте только синтетические документы и код.

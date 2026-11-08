@@ -62,10 +62,16 @@ class CodingOrchestrator:
         transport: str = "internal",
     ) -> CodingTaskResult:
         self._authorize(principal, project_id, transport)
+        resolved_base = self._worktrees.resolve_base_commit(repository, base_commit)
+        if task.context_commit_sha and task.context_commit_sha != resolved_base:
+            raise ValueError(
+                "Retrieved code context does not match the requested base commit"
+            )
         worktree = self._worktrees.create(repository, base_commit)
         previous_results = []
         build = None
         test = None
+        patch_applied = False
         message = "Patch did not pass verification"
 
         for attempt in range(self._max_repair_iterations + 1):
@@ -78,12 +84,27 @@ class CodingOrchestrator:
                     task, attempt, tuple(previous_results)
                 )
                 self._worktrees.apply_patch(worktree, patch)
+                patch_applied = True
             except PatchUnavailableError as error:
                 message = str(error)
                 break
             except PatchRejectedError as error:
                 message = str(error)
+                previous_results.append(
+                    SandboxResult(
+                        stage="patch_validation",
+                        command=(),
+                        exit_code=1,
+                        duration_ms=0,
+                        timed_out=False,
+                        stdout_tail="",
+                        stderr_tail=message[:4000],
+                    )
+                )
                 continue
+            except RuntimeError as error:
+                message = f"Patch provider failed ({type(error).__name__})"
+                break
 
             build = self._sandbox.run(worktree.path, self._build_command, "build")
             previous_results.append(build)
@@ -103,6 +124,7 @@ class CodingOrchestrator:
                     principal,
                     project_id,
                     transport,
+                    patch_applied,
                 )
 
         return self._result(
@@ -116,6 +138,7 @@ class CodingOrchestrator:
             principal,
             project_id,
             transport,
+            patch_applied,
         )
 
     def _result(
@@ -130,6 +153,7 @@ class CodingOrchestrator:
         principal: Principal,
         project_id: str,
         transport: str,
+        patch_applied: bool,
     ) -> CodingTaskResult:
         diff = self._worktrees.diff(worktree)
         changed_files = self._worktrees.changed_files(worktree)
@@ -150,6 +174,7 @@ class CodingOrchestrator:
             build=build,
             test=test,
             message=message,
+            patch_applied=patch_applied,
         )
         self._audit.record_audit(
             principal.user_id,
@@ -165,6 +190,7 @@ class CodingOrchestrator:
                 "changed_files": len(changed_files),
                 "tests_changed": tests_changed,
                 "repair_iterations": repair_iterations,
+                "patch_applied": patch_applied,
             },
         )
         return result
