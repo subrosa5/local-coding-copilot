@@ -3,13 +3,15 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from fake_inference import MOCK_NOTIONAL_DIFF, fake_inference_endpoint
 
 from local_coding_copilot.auth import Principal
 from local_coding_copilot.coding.models import CodingTask
 from local_coding_copilot.coding.orchestrator import CodingOrchestrator
-from local_coding_copilot.coding.patches import StaticPatchProvider
+from local_coding_copilot.coding.patches import ModelPatchProvider, StaticPatchProvider
 from local_coding_copilot.coding.sandbox import DockerSandbox, SandboxConfig
 from local_coding_copilot.coding.worktree import GitWorktreeManager
+from local_coding_copilot.providers import OpenAICompatibleLLMProvider
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -156,6 +158,33 @@ def test_prepared_patch_passes_real_build_and_tests(
     )
     assert result.diff
     assert result.tests_changed
+
+
+def test_fake_http_model_patch_passes_real_build_and_tests(
+    exchange_repository: Path, tmp_path: Path, admin_principal: Principal
+) -> None:
+    with fake_inference_endpoint((MOCK_NOTIONAL_DIFF,)) as (endpoint, requests):
+        provider = OpenAICompatibleLLMProvider(endpoint, "test-only-mock-coder")
+        result = CodingOrchestrator(
+            worktrees=GitWorktreeManager(tmp_path / "worktrees"),
+            sandbox=DockerSandbox(SandboxConfig(timeout_seconds=30)),
+            patches=ModelPatchProvider(provider),
+            audit=RecordingAudit(),
+        ).run(
+            exchange_repository,
+            CodingTask("notional-boundary", "Apply the synthetic mock fixture"),
+            "default",
+            principal=admin_principal,
+        )
+
+    assert result.status == "awaiting_review", result.message
+    assert result.repair_iterations == 0
+    assert result.build is not None and result.build.exit_code == 0
+    assert result.test is not None
+    assert result.test.exit_code == 0, result.test.stdout_tail + result.test.stderr_tail
+    assert result.patch_applied
+    assert result.tests_changed
+    assert len(requests) == 1
 
 
 class RecordingAudit:

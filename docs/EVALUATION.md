@@ -50,6 +50,10 @@ Grounded path дополнительно проверяет существова
 
 На M7 `copilot-coding-evaluation` сравнивает три режима на одном commit и наборе coding-задач: Base (полный ограниченный snapshot tracked Python-файлов из Git, без retrieval и repair), RAG (grounded code citations, без repair) и RAG + test loop (grounded citations, максимум две repair iterations). Все три режима получают исходный код: Base получает snapshot до 24 KiB суммарно, RAG — только выбранные commit-matched citations. `evals/coding_benchmark.json` содержит только task ID и instructions; loader отвергает дополнительные поля и runner не загружает prepared patch files. `patch_applied` и `patch_apply_rate` относятся к итоговому worktree diff после последней попытки, а не к промежуточной попытке, которую repair сбросил. Cleanup error сохраняется в результате задачи и не прерывает отчёт. Отчёт содержит SHA-256 canonical task set, base commit, configured model/endpoint, rates применения patch/build/test, число repairs, длительность, p50/p95 LLM request latency и tokens/sec, если endpoint возвращает usage. `pass_at_1` измеряется для Base/RAG; `success_after_repairs` отдельно отражает RAG + test loop. Human acceptance, VRAM и RAM автоматически не предполагаются и остаются ручными измерениями. Набор мал и синтетический, его результаты не доказывают качество на реальном коде.
 
+### Fake HTTP integration simulation
+
+Test-only endpoint в `tests/fake_inference.py` возвращает scripted mock responses, включая явно обозначенный `MOCK_NOTIONAL_DIFF`. Сквозные тесты проверяют реальный OpenAI-compatible HTTP provider, `ModelPatchProvider`, diff validation, Git worktree, bounded repair и audit; отдельный Docker-тест завершает этот путь реальными compileall/unittest. Fixture не загружается benchmark runner и не засчитывается как model-generated patch. Успешная симуляция доказывает только совместимость компонентов и работу защитного контура. Она не измеряет качество генерации, VRAM/RAM, latency настоящей модели, GPU, offline или production-readiness. Embeddings остаются fake; hardware/model gate на RTX 4070 Ti обязателен отдельно.
+
 ### Производительность
 
 - p50/p95 latency и time to first token;
