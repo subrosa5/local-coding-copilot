@@ -255,12 +255,6 @@ def _chat_completions_url(base_url: str) -> str:
         raise ValueError("base_url has an invalid port") from None
     if port is not None and not 1 <= port <= 65535:
         raise ValueError("base_url has an invalid port")
-    try:
-        port = parsed.port
-    except ValueError:
-        raise ValueError("base_url has an invalid port") from None
-    if port is not None and not 1 <= port <= 65535:
-        raise ValueError("base_url has an invalid port")
     is_loopback = hostname == "localhost"
     with suppress(ValueError):
         is_loopback = is_loopback or ipaddress.ip_address(hostname).is_loopback
@@ -292,8 +286,6 @@ def _parse_response(response: object) -> ChatResponse:
     message = choices[0].get("message")
     if not isinstance(message, dict):
         raise RuntimeError("Local inference endpoint returned a malformed message")
-    if message.get("role", "assistant") != "assistant":
-        raise RuntimeError("Local inference endpoint returned a non-assistant message")
     if message.get("role", "assistant") != "assistant":
         raise RuntimeError("Local inference endpoint returned a non-assistant message")
     content = message.get("content")

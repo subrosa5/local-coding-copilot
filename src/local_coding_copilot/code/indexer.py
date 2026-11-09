@@ -39,13 +39,19 @@ class GitCodeIndexer:
             raise ValueError("Repository must have a clean Git worktree")
 
         commit_sha = _git(root, "rev-parse", "HEAD")
-        tracked_paths = sorted(_git(root, "ls-files", "--", "*.py").splitlines())
+        tracked_blobs = _tracked_python_blobs(root, commit_sha)
+        tracked_paths = sorted(tracked_blobs)
         current_hashes = {}
         contents = {}
         for path in tracked_paths:
-            content = (root / path).read_text(encoding="utf-8")
+            blob_sha = tracked_blobs[path]
+            raw_content = _git_bytes(root, "cat-file", "blob", blob_sha)
+            try:
+                content = raw_content.decode("utf-8")
+            except UnicodeDecodeError:
+                raise ValueError(f"Tracked Python file is not UTF-8: {path}") from None
             contents[path] = content
-            current_hashes[path] = hashlib.sha256(content.encode()).hexdigest()
+            current_hashes[path] = hashlib.sha256(raw_content).hexdigest()
 
         previous_hashes = self._repository.indexed_files(project_id, repository)
         changed_paths = tuple(
@@ -132,3 +138,34 @@ def _git(root: Path, *arguments: str) -> str:
         capture_output=True,
         text=True,
     ).stdout.strip()
+
+
+def _git_bytes(root: Path, *arguments: str) -> bytes:
+    return subprocess.run(
+        ["git", "-C", str(root), *arguments],
+        check=True,
+        capture_output=True,
+    ).stdout
+
+
+def _tracked_python_blobs(root: Path, commit_sha: str) -> dict[str, str]:
+    """Return committed regular Python blobs without following checkout symlinks."""
+    tree = _git_bytes(root, "ls-tree", "-r", "-z", "--full-tree", commit_sha)
+    blobs: dict[str, str] = {}
+    for entry in tree.split(b"\0"):
+        if not entry:
+            continue
+        metadata, raw_path = entry.split(b"\t", maxsplit=1)
+        mode, object_type, object_sha = metadata.decode("ascii").split()
+        if not raw_path.endswith(b".py"):
+            continue
+        if mode not in {"100644", "100755"} or object_type != "blob":
+            raise ValueError(
+                "Tracked Python paths must be regular files; symlinks are not indexed"
+            )
+        try:
+            path = raw_path.decode("utf-8")
+        except UnicodeDecodeError:
+            raise ValueError("Tracked Python path is not UTF-8") from None
+        blobs[path] = object_sha
+    return blobs

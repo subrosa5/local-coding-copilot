@@ -85,20 +85,21 @@
 
 ## M7 — Реальная локальная LLM и offline validation
 
-**Статус:** in_progress (подготовка кода и CI; hardware validation ещё не начата).
+**Статус:** in_progress (provider, model patch workflow, benchmark harness и fake-HTTP integration покрыты кодом/CI; hardware/model validation ещё не начата).
 
-- Реализовать сменный provider для OpenAI-compatible локального endpoint без привязки к inference server; fake HTTP server tests не обращаются к внешним AI API.
-- Подключить настроенную LLM к document/code RAG; embeddings пока остаются fake и должны быть отражены в итоговых выводах.
-- Подключить model-based patch generation к существующим `PatchProvider` и coding orchestration; валидировать tool calls по allowlist/schema и unified diff до `git apply`.
-- Проверять сквозной fake HTTP → model patch → worktree → sandbox → repair/audit путь только scripted test fixture; это integration simulation, не model generation benchmark и не hardware validation.
-- Запустить quantized coding model на RTX 4070 Ti: сначала 7B, затем сравнить с 14B при наличии VRAM.
-- Проверить initial patch и максимум две repair iterations на синтетических coding tasks.
-- Сравнить полный ограниченный source snapshot без RAG, LLM + grounded code RAG и LLM + RAG + test loop.
-- Замерить VRAM/RAM, latency, tokens/sec, полное время задачи, pass@1, применимость patch, build/test success, repairs и human acceptance.
-- Предварительно загрузить модели и Docker images; проверить offline после отключения интернета.
-- Записать фактические результаты и ограничения. CI продолжает использовать fake/deterministic providers без GPU и внешних AI API.
+- Код завершён: сменный provider для OpenAI-compatible loopback endpoint; fake HTTP tests не обращаются к внешним AI API.
+- Код завершён: настроенная LLM подключена к document/code RAG; embeddings пока fake, reranker не включён.
+- Код завершён: model-based patch generation подключена к `PatchProvider`/coding orchestration; tool calls валидируются по allowlist/schema, unified diff — до `git apply`.
+- Код/CI завершены: сквозной scripted fake HTTP → model patch → worktree → sandbox → repair/audit. Это integration simulation, не model generation benchmark и не hardware validation.
+- Осталось: запустить quantized coding model на RTX 4070 Ti — сначала 7B, затем сравнить с 14B при наличии VRAM.
+- Осталось: проверить initial patch и максимум две repair iterations на реальных запусках модели.
+- Осталось: подключить локальные embeddings и оценить retrieval на зафиксированном наборе; reranker добавлять только при измеримом улучшении.
+- Осталось: расширить coding benchmark независимыми acceptance tests; текущие три задачи являются smoke-level baseline.
+- Осталось: измерить VRAM/RAM, latency, tokens/sec, полное время coding-задачи, verified success и human acceptance.
+- Осталось: предварительно загрузить модели и Docker images; проверить offline после отключения интернета.
+- Осталось: записать фактические результаты и ограничения. CI продолжает использовать fake/deterministic providers без GPU и внешних AI API.
 
-**Gate:** model-based patches проходят существующий sandbox/repair/review flow; benchmark и offline-проверка выполнены на целевом ПК; фактические показатели и ограничения задокументированы. Успешный GitHub CI сам по себе не подтверждает работу GPU, offline или производительность.
+**Gate:** настоящий локальный provider и embeddings проходят coding/RAG сценарии; расширенный benchmark и offline-проверка выполнены на целевом ПК; фактические показатели и ограничения задокументированы. Успешный GitHub CI или scripted fake endpoint сами по себе не подтверждают качество генерации, работу GPU, offline или производительность.
 
 ## M8 — Приёмка тестировщиками
 

@@ -288,8 +288,12 @@ def _summarize(
         "base_commit": base_commit,
         "task_success": passed,
         "task_success_rate": _rate(passed, count),
-        "pass_at_1": _rate(passed, count) if name in {"base", "rag"} else None,
-        "success_after_repairs": passed if name == "rag_test_loop" else None,
+        "single_attempt_verified_rate": (
+            _rate(passed, count) if name in {"base", "rag"} else None
+        ),
+        "success_after_repairs_rate": (
+            _rate(passed, count) if name == "rag_test_loop" else None
+        ),
         "patch_apply_rate": _rate(applied, count),
         "build_pass_rate": _rate(builds, count),
         "test_pass_rate": _rate(tests, count),

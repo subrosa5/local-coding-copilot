@@ -26,7 +26,7 @@ HTTP client / MCP client / IDE
 
 ### API и MCP
 
-FastAPI HTTP и MCP stdio вызывают один `Application` с общими `DocumentRAGService` и auth service. Они не содержат отдельных реализаций retrieval или orchestration. HTTP аутентифицирует Bearer token, MCP получает токен из окружения процесса. Права определяются по записи токена и project membership в PostgreSQL, а не по аргументам запроса. Транспорты предназначены только для локальных синтетических данных.
+FastAPI HTTP и MCP stdio вызывают один `Application` с общими `DocumentRAGService` и auth service. Они не содержат отдельных реализаций retrieval или orchestration. HTTP аутентифицирует Bearer token, MCP получает токен из окружения процесса. Права определяются по записи токена и project membership в PostgreSQL, а не по аргументам запроса. Это локальные optional transports, не облачные AI API; HTTP слушает loopback. Coding workflow сейчас доступен через CLI. Если конечная поверхность продукта должна обходиться без HTTP/MCP, эти адаптеры остаются только для разработки и не включаются в неё.
 
 ### Provider interfaces
 
@@ -44,6 +44,8 @@ POC не зависит от конкретного inference server и не о�
 Document RAG использует PostgreSQL full-text и pgvector candidates, объединённые через Reciprocal Rank Fusion. SQL CTE `visible_chunks` ограничивает chunks membership пользователя и выбранным проектом до обоих candidate generators. Повторная индексация атомарно заменяет документ и его chunks. Внутренний document ID имеет namespace проекта, поэтому одинаковые пути разных проектов не перезаписывают друг друга. Ответ содержит `source:start_line-end_line@version`, project ID и retrieval trace со vector/lexical scores.
 
 Code RAG индексирует только tracked Python-файлы чистого Git checkout. Tree-sitter извлекает классы, функции и методы с qualified symbol names и line ranges. PostgreSQL выполняет exact path/symbol/content search, full-text и pgvector retrieval с RRF; ACL действует до candidate generation. Citations содержат repository, path, symbol, lines и commit SHA. Incremental indexer сравнивает SHA-256 содержимого, заменяет только изменённые файлы, удаляет исчезнувшие и обновляет commit metadata без повторной векторизации неизменённых файлов. Reranker provider пока не подключён.
+
+Текущая сборка подключает `FakeEmbeddingProvider` к обоим RAG-путям. Его векторы детерминированы, но не кодируют семантическую близость; качество vector retrieval не подтверждено. Индексатор читает regular blobs зафиксированного Git tree и отклоняет tracked Python symlinks, не dereference-ит их из файловой системы.
 
 Текущая document-запись содержит:
 

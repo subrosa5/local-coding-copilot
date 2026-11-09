@@ -1,6 +1,6 @@
 # Эксплуатация
 
-**Текущее состояние M6:** document RAG работает с PostgreSQL/pgvector, fake embeddings и fake LLM без LLM-конфигурации. На M7-ветке можно подключить локальный OpenAI-compatible inference endpoint. Все операции с документами требуют локальный токен и project membership; ingestion разрешён только admin. Используйте только синтетические документы.
+**Текущее состояние:** M0–M6 и программная часть M7 влиты в `main`. Без LLM-настроек приложение использует fake LLM и fake embeddings. Coding CLI поддерживает OpenAI-compatible loopback inference endpoint и model-generated patch. Реальная модель, настоящие embeddings, GPU и offline пока не проверены. Все операции с документами требуют локальный токен и project membership; ingestion разрешён только admin. Используйте только синтетические документы.
 
 ## Установка и запуск
 
@@ -100,7 +100,7 @@ export COPILOT_LLM_TIMEOUT_SECONDS=120
 export COPILOT_LLM_MAX_TOKENS=8192
 ```
 
-Endpoint должен предоставлять `POST /v1/chat/completions`. Запустите выбранный локальный inference server отдельно и привяжите его к loopback интерфейсу. Конкретная модель и команда запуска зависят от целевого ПК и проверяются на M7 hardware gate.
+Endpoint должен предоставлять `POST /v1/chat/completions`. Запустите выбранный локальный inference server отдельно и привяжите его к loopback интерфейсу. Конкретная модель и команда запуска зависят от целевого ПК; они ещё не валидированы на M7 hardware gate.
 
 Индексируйте тот же чистый commit `exchange-demo`, на котором будет строиться worktree:
 
@@ -144,7 +144,7 @@ copilot-coding-evaluation \
   --output data/runtime/m7-coding-evaluation.json
 ```
 
-Runner выполняет Base, RAG и RAG + test loop на одном base commit. Benchmark dataset разрешает только `task_id` и `instructions`; runner не открывает `evals/coding_tasks.json` или prepared patches. Каждая задача получает отдельный detached worktree; после сохранения diff hash и метрик benchmark удаляет созданный им worktree. Отчёт не содержит prompts, responses или diff body. `human_acceptance` остаётся `null` до ручной разметки. Набор синтетический и мал, поэтому его цифры — исходная точка, а не подтверждение качества модели.
+Runner выполняет Base, RAG и RAG + test loop на одном base commit. Benchmark dataset разрешает только `task_id` и `instructions`; runner не открывает `evals/coding_tasks.json` или prepared patches. Сейчас в dataset три синтетические задачи, поэтому это smoke-level baseline, не оценка обобщающего качества. Каждая задача получает отдельный detached worktree; после сохранения diff hash и метрик benchmark удаляет созданный им worktree. Отчёт не содержит prompts, responses или diff body. `human_acceptance` остаётся `null` до ручной разметки. Метрики verified-rate отражают прохождение текущих compileall/unittest, не независимых hidden acceptance tests.
 
 ## Rate limits и audit
 
@@ -168,7 +168,7 @@ Evaluation сохраняет `data/runtime/m3-evaluation.json`, сравнив�
 
 ## Будущая локальная конфигурация
 
-Целевой запуск — один домашний ПК, Docker Compose, PostgreSQL/pgvector и OpenAI-compatible model endpoint. Реальные локальные модели и offline-проверка относятся к M7. Модели, runtime-данные и логи хранятся вне Git.
+Целевой запуск — один домашний ПК, Docker Compose, PostgreSQL/pgvector и OpenAI-compatible model endpoint. Реальные локальные модели, embeddings и offline-проверка остаются незакрытой частью M7. Модели, runtime-данные и логи хранятся вне Git.
 
 ## Что должно быть задокументировано к приёмке
 
