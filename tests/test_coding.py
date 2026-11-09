@@ -119,6 +119,25 @@ def test_worktree_rejects_non_applicable_patch(
     assert manager.diff(worktree) == ""
 
 
+def test_worktree_rejects_patch_targeting_symlink(
+    exchange_repository: Path, tmp_path: Path
+) -> None:
+    manager = GitWorktreeManager(tmp_path / "worktrees")
+    worktree = manager.create(exchange_repository)
+    alias = worktree.path / "src/exchange_demo/alias.py"
+    alias.symlink_to("orders.py")
+    patch = (
+        "diff --git a/src/exchange_demo/alias.py b/src/exchange_demo/alias.py\n"
+        "--- a/src/exchange_demo/alias.py\n"
+        "+++ b/src/exchange_demo/alias.py\n"
+        "@@ -1 +1 @@\n"
+        "-old\n+new\n"
+    )
+
+    with pytest.raises(PatchRejectedError, match="symlink"):
+        manager.apply_patch(worktree, patch)
+
+
 def test_static_patch_provider_loads_all_prepared_tasks() -> None:
     provider = StaticPatchProvider.from_file(TASKS_PATH)
 
@@ -248,6 +267,63 @@ def test_missing_patch_returns_failed_without_running_sandbox(
     assert result.repair_iterations == 0
     assert result.build is None and result.test is None
     assert sandbox.calls == []
+
+
+def test_patch_applied_reflects_final_worktree_after_unavailable_repair(
+    exchange_repository: Path, tmp_path: Path, admin_principal: Principal
+) -> None:
+    patch = StaticPatchProvider.from_file(TASKS_PATH).propose_patch(
+        CodingTask("notional-boundary", ""), 0, ()
+    )
+    audit = RecordingAudit()
+    result = make_orchestrator(
+        tmp_path,
+        FakeSandbox(test_exit_codes=[1]),
+        StaticPatchProvider({"notional-boundary": (patch,)}),
+        audit,
+    ).run(
+        exchange_repository,
+        CodingTask("notional-boundary", ""),
+        "default",
+        principal=admin_principal,
+    )
+
+    assert result.status == "failed"
+    assert result.diff == ""
+    assert result.changed_files == ()
+    assert result.patch_applied is False
+    assert audit.events[-1]["args"][-1]["patch_applied"] is False
+
+
+def test_invalid_patch_is_reported_to_bounded_repair_attempt(
+    exchange_repository: Path, tmp_path: Path, admin_principal: Principal
+) -> None:
+    valid_patch = StaticPatchProvider.from_file(TASKS_PATH).propose_patch(
+        CodingTask("notional-boundary", ""), 0, ()
+    )
+
+    class RepairProvider:
+        def __init__(self) -> None:
+            self.feedback: list[tuple[SandboxResult, ...]] = []
+
+        def propose_patch(self, task, attempt, previous_results):
+            self.feedback.append(previous_results)
+            return "not a unified diff" if attempt == 0 else valid_patch
+
+    patches = RepairProvider()
+    result = make_orchestrator(tmp_path, FakeSandbox(), patches, RecordingAudit()).run(
+        exchange_repository,
+        CodingTask("notional-boundary", ""),
+        "default",
+        principal=admin_principal,
+    )
+
+    assert result.status == "awaiting_review"
+    assert result.patch_applied
+    assert result.repair_iterations == 1
+    assert patches.feedback[0] == ()
+    assert patches.feedback[1][0].stage == "patch_validation"
+    assert "raw unified diff" in patches.feedback[1][0].stderr_tail
 
 
 @pytest.mark.parametrize(

@@ -39,6 +39,9 @@
 - Tool arguments валидируются по схеме и политике вне LLM.
 - Guardrail/critic являются дополнительными проверками, не security boundary.
 - Внешние providers отключены в local/offline режиме.
+- M7 OpenAI-compatible provider принимает только HTTP loopback endpoints, отключает proxy и redirect forwarding, ограничивает размер ответа и не пишет тело ошибок/секреты в сообщения.
+- Имена и аргументы возвращённых tool calls проверяются по tool allowlist и поддерживаемому подмножеству JSON Schema; неизвестные schema keywords отклоняются. M7 coding patch provider tool calls не принимает.
+- Unified diff проверяется до `git apply`: ограничены размер и число файлов; traversal, `.git`, binary/mode changes, add/delete/rename и symlink targets отклоняются. `git apply --check` остаётся обязательным.
 - Merge, production access и опасные network tools не предоставляются агенту.
 
 ### Sandbox
@@ -73,5 +76,6 @@
 5. Задача превышает время, память и число repair iterations.
 6. Агент пытается изменить тесты или выполнить merge.
 7. Полные секретные значения не появляются в логах.
+8. M7 отвергает удалённый endpoint, redirects, tool call вне allowlist/schema и patch с traversal, binary/mode changes или symlink path.
 
 Успешное выполнение запрещённого действия является критичным блокером приёмки.

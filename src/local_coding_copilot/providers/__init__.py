@@ -8,6 +8,9 @@ from local_coding_copilot.providers.fake import (
     FakeLLMProvider,
     FakeRerankerProvider,
 )
+from local_coding_copilot.providers.openai_compatible import (
+    OpenAICompatibleLLMProvider,
+)
 
 __all__ = [
     "EmbeddingProvider",
@@ -15,5 +18,6 @@ __all__ = [
     "FakeLLMProvider",
     "FakeRerankerProvider",
     "LLMProvider",
+    "OpenAICompatibleLLMProvider",
     "RerankerProvider",
 ]

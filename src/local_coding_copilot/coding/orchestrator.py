@@ -62,6 +62,11 @@ class CodingOrchestrator:
         transport: str = "internal",
     ) -> CodingTaskResult:
         self._authorize(principal, project_id, transport)
+        resolved_base = self._worktrees.resolve_base_commit(repository, base_commit)
+        if task.context_commit_sha and task.context_commit_sha != resolved_base:
+            raise ValueError(
+                "Retrieved code context does not match the requested base commit"
+            )
         worktree = self._worktrees.create(repository, base_commit)
         previous_results = []
         build = None
@@ -83,7 +88,21 @@ class CodingOrchestrator:
                 break
             except PatchRejectedError as error:
                 message = str(error)
+                previous_results.append(
+                    SandboxResult(
+                        stage="patch_validation",
+                        command=(),
+                        exit_code=1,
+                        duration_ms=0,
+                        timed_out=False,
+                        stdout_tail="",
+                        stderr_tail=message[:4000],
+                    )
+                )
                 continue
+            except RuntimeError as error:
+                message = f"Patch provider failed ({type(error).__name__})"
+                break
 
             build = self._sandbox.run(worktree.path, self._build_command, "build")
             previous_results.append(build)
@@ -133,6 +152,7 @@ class CodingOrchestrator:
     ) -> CodingTaskResult:
         diff = self._worktrees.diff(worktree)
         changed_files = self._worktrees.changed_files(worktree)
+        patch_applied = bool(diff and changed_files)
         diff_sha256 = hashlib.sha256(diff.encode()).hexdigest()
         tests_changed = any(
             path == "tests" or path.startswith("tests/") for path in changed_files
@@ -150,6 +170,7 @@ class CodingOrchestrator:
             build=build,
             test=test,
             message=message,
+            patch_applied=patch_applied,
         )
         self._audit.record_audit(
             principal.user_id,
@@ -165,6 +186,7 @@ class CodingOrchestrator:
                 "changed_files": len(changed_files),
                 "tests_changed": tests_changed,
                 "repair_iterations": repair_iterations,
+                "patch_applied": patch_applied,
             },
         )
         return result

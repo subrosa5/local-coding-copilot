@@ -6,6 +6,8 @@ from typing import Literal
 class CodingTask:
     task_id: str
     instructions: str
+    context: tuple[str, ...] = ()
+    context_commit_sha: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,3 +35,4 @@ class CodingTaskResult:
     build: SandboxResult | None
     test: SandboxResult | None
     message: str
+    patch_applied: bool = False

@@ -83,16 +83,21 @@
 
 **Gate:** несколько подготовленных задач дают реальный проверенный patch; запрещённые действия блокируются.
 
-## M7 — Целевой ПК и offline validation
+## M7 — Реальная локальная LLM и offline validation
 
-**Статус:** todo.
+**Статус:** in_progress (подготовка кода и CI; hardware validation ещё не начата).
 
-- Запустить выбранную quantized coding model на 4070 Ti.
-- Проверить local providers, VRAM/RAM, latency и 2–3 пользователей.
-- Проверить offline после предварительной загрузки артефактов.
-- Выполнить полный benchmark с реальной моделью.
+- Реализовать сменный provider для OpenAI-compatible локального endpoint без привязки к inference server; fake HTTP server tests не обращаются к внешним AI API.
+- Подключить настроенную LLM к document/code RAG; embeddings пока остаются fake и должны быть отражены в итоговых выводах.
+- Подключить model-based patch generation к существующим `PatchProvider` и coding orchestration; валидировать tool calls по allowlist/schema и unified diff до `git apply`.
+- Запустить quantized coding model на RTX 4070 Ti: сначала 7B, затем сравнить с 14B при наличии VRAM.
+- Проверить initial patch и максимум две repair iterations на синтетических coding tasks.
+- Сравнить полный ограниченный source snapshot без RAG, LLM + grounded code RAG и LLM + RAG + test loop.
+- Замерить VRAM/RAM, latency, tokens/sec, полное время задачи, pass@1, применимость patch, build/test success, repairs и human acceptance.
+- Предварительно загрузить модели и Docker images; проверить offline после отключения интернета.
+- Записать фактические результаты и ограничения. CI продолжает использовать fake/deterministic providers без GPU и внешних AI API.
 
-**Gate:** задокументированы фактические показатели; непроверенные заявления отсутствуют.
+**Gate:** model-based patches проходят существующий sandbox/repair/review flow; benchmark и offline-проверка выполнены на целевом ПК; фактические показатели и ограничения задокументированы. Успешный GitHub CI сам по себе не подтверждает работу GPU, offline или производительность.
 
 ## M8 — Приёмка тестировщиками
 

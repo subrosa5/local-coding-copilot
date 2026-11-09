@@ -3,12 +3,6 @@ from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)
-class Message:
-    role: Literal["system", "user", "assistant", "tool"]
-    content: str
-
-
-@dataclass(frozen=True, slots=True)
 class ToolDefinition:
     name: str
     description: str
@@ -19,6 +13,15 @@ class ToolDefinition:
 class ToolCall:
     name: str
     arguments: dict[str, object]
+    call_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Message:
+    role: Literal["system", "user", "assistant", "tool"]
+    content: str
+    tool_call_id: str | None = None
+    tool_calls: tuple[ToolCall, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

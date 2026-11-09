@@ -109,7 +109,10 @@ def application(
     rag_service: DocumentRAGService, admin_principal: Principal
 ) -> Application:
     return Application(
-        rag_service, StaticAuthService(admin_principal), code_service=rag_service
+        rag_service,
+        StaticAuthService(admin_principal),
+        code_service=rag_service,
+        llm=FakeLLMProvider(response="Grounded fake answer", cite_sources=True),
     )
 
 

@@ -1,6 +1,6 @@
 # Эксплуатация
 
-**Текущее состояние:** document RAG работает с PostgreSQL/pgvector, fake embeddings и fake LLM. Доступны ingestion CLI, HTTP и MCP. Все операции с документами требуют локальный токен и project membership; ingestion разрешён только admin. Используйте только loopback/stdio и синтетические документы.
+**Текущее состояние M6:** document RAG работает с PostgreSQL/pgvector, fake embeddings и fake LLM без LLM-конфигурации. На M7-ветке можно подключить локальный OpenAI-compatible inference endpoint. Все операции с документами требуют локальный токен и project membership; ingestion разрешён только admin. Используйте только синтетические документы.
 
 ## Установка и запуск
 
@@ -89,7 +89,27 @@ HTTP endpoint: `POST /v1/code/query` с тем же Bearer auth и JSON, что 
 
 ## Coding loop и ручной review
 
-Предварительно загрузите образ и используйте admin token проекта. Исходный checkout должен быть чистым:
+Предварительно загрузите образ и используйте admin token проекта. Исходный checkout должен быть чистым. Для генерации patch задайте локальный inference endpoint; provider принимает только loopback HTTP URL, не использует системный proxy и не следует redirects:
+
+```bash
+export COPILOT_LLM_BASE_URL=http://127.0.0.1:8080/v1
+export COPILOT_LLM_MODEL=your-local-model-id
+# Только если локальный server требует Bearer auth:
+# export COPILOT_LLM_API_KEY=local-only-token
+export COPILOT_LLM_TIMEOUT_SECONDS=120
+export COPILOT_LLM_MAX_TOKENS=8192
+```
+
+Endpoint должен предоставлять `POST /v1/chat/completions`. Запустите выбранный локальный inference server отдельно и привяжите его к loopback интерфейсу. Конкретная модель и команда запуска зависят от целевого ПК и проверяются на M7 hardware gate.
+
+Индексируйте тот же чистый commit `exchange-demo`, на котором будет строиться worktree:
+
+```bash
+python -m local_coding_copilot.code_cli index ../exchange-demo \
+  --repository exchange-demo --project-id default
+```
+
+По умолчанию coding CLI использует реальный endpoint, grounded code citations и model-generated patch:
 
 ```bash
 docker pull python:3.11-slim
@@ -98,7 +118,9 @@ python -m local_coding_copilot.coding_cli \
   --project-id default
 ```
 
-Доступные task ID: `notional-boundary`, `price-time-priority`, `stale-threshold`. `StaticPatchProvider` выбирает подготовленный patch из `evals/coding_tasks.json`; реальная LLM код пока не генерирует. CLI создаёт detached worktree в `data/runtime/worktrees`, применяет unified diff и запускает `compileall` и `unittest` в Docker без сети. Допускается первоначальная попытка и максимум два repair.
+`--context-mode base` отключает retrieval и передаёт модели ограниченный snapshot tracked Python-файлов из указанного Git commit (до 200 файлов, не более 16 KiB на файл и 24 KiB суммарно). Это baseline без retrieval, но с исходным кодом. Для детерминированной демонстрации M6 выберите `--patch-provider static`; она читает prepared patch из M6 dataset и не является генерацией LLM.
+
+Доступные task ID: `notional-boundary`, `price-time-priority`, `stale-threshold`. В LLM-режиме CLI получает кодовые citations текущего commit и просит модель вернуть только raw unified diff. Проверка отклоняет prose/Markdown, binary/mode changes, добавление/удаление/rename, traversal, `.git` и symlink paths; затем `git apply --check` выполняется в отдельном worktree. CLI запускает `compileall` и `unittest` в Docker без сети. Допускается первоначальная попытка и максимум два repair. Невалидный diff не применяется и расходует одну попытку repair. Успешный diff остаётся для human review; автоматического merge нет.
 
 При успехе статус `awaiting_review`, а JSON содержит worktree, base commit, diff, diff SHA-256, changed files, `tests_changed`, stdout/stderr tails и результаты build/test. Подготовленные исправления удаляют соответствующий `@unittest.expectedFailure`, поэтому `tests_changed=true` ожидаемо, но обязательно проверяется человеком. Статус не означает approval или merge.
 
@@ -109,6 +131,20 @@ git -C ../exchange-demo worktree remove --force /absolute/path/from/result
 ```
 
 Не удаляйте worktree до завершения review. При ошибке исследуйте технические tails в JSON; полные логи и diff не записываются в audit.
+
+### M7 coding benchmark
+
+После индексации `exchange-demo` и запуска локального endpoint сравните три конфигурации:
+
+```bash
+copilot-coding-evaluation \
+  --repository ../exchange-demo \
+  --tasks evals/coding_benchmark.json \
+  --project-id default \
+  --output data/runtime/m7-coding-evaluation.json
+```
+
+Runner выполняет Base, RAG и RAG + test loop на одном base commit. Benchmark dataset разрешает только `task_id` и `instructions`; runner не открывает `evals/coding_tasks.json` или prepared patches. Каждая задача получает отдельный detached worktree; после сохранения diff hash и метрик benchmark удаляет созданный им worktree. Отчёт не содержит prompts, responses или diff body. `human_acceptance` остаётся `null` до ручной разметки. Набор синтетический и мал, поэтому его цифры — исходная точка, а не подтверждение качества модели.
 
 ## Rate limits и audit
 

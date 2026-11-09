@@ -1,0 +1,14 @@
+[
+  {
+    "task_id": "notional-boundary",
+    "instructions": "Accept an order whose notional is exactly 1000000 USD and keep rejecting larger values."
+  },
+  {
+    "task_id": "price-time-priority",
+    "instructions": "Select the highest-priced bid first, then the earliest bid when prices are equal."
+  },
+  {
+    "task_id": "stale-threshold",
+    "instructions": "Treat market data as stale when its age is exactly the configured threshold."
+  }
+]
