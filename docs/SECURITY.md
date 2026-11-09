@@ -52,6 +52,8 @@
 - Coding task разрешён только admin с project membership; авторизация выполняется до создания worktree.
 - `tests_changed` и diff SHA включаются в review/audit. Изменённые тесты требуют человеческой проверки: успешный unittest сам по себе не доказывает корректность patch.
 - Интеграционные тесты проверяют network denial, отсутствие host paths/socket, read-only root, non-root и timeout. Лимиты памяти/CPU настроены, но стресс-тестирование изоляции и ресурсов ещё не выполнено.
+- Вывод контейнера читается потоково и сохраняется только ограниченный хвост, чтобы вывод недоверенного процесса не накапливался целиком в памяти хоста.
+- Code indexer читает regular blobs из зафиксированного Git tree и отклоняет tracked Python symlinks; пути не открываются через рабочую файловую систему checkout.
 - Для production рассматриваются gVisor/Kata/VM и отдельные CI-ноды; Docker POC не является гарантией против всех container escape.
 
 ### Логи и аудит
@@ -77,5 +79,6 @@
 6. Агент пытается изменить тесты или выполнить merge.
 7. Полные секретные значения не появляются в логах.
 8. M7 отвергает удалённый endpoint, redirects, tool call вне allowlist/schema и patch с traversal, binary/mode changes или symlink path.
+9. Code indexer не читает tracked Python symlink, ведущий за пределы checkout; sandbox ограничивает объём stdout/stderr, накопленный в памяти хоста.
 
 Успешное выполнение запрещённого действия является критичным блокером приёмки.

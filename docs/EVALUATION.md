@@ -14,7 +14,7 @@
 
 ### Code set
 
-`exchange-demo` содержит зафиксированный Git history, правила, unittest suite и три намеренных дефекта с expected failures. Code RAG integration-тесты проверяют symbol/path/commit retrieval и incremental updates. `evals/coding_tasks.json` и три `.patch` файла задают deterministic M6 harness: CI применяет каждый patch к синтетической копии репозитория и выполняет реальные compileall/unittest в Docker. Это проверяет patch/test/review контур, но не pass@1 генерации LLM. Набор из 20–30 coding-задач с исходным commit и скрытыми acceptance tests планируется отдельно: bug fix, небольшая feature, refactoring, API compatibility, test repair и cross-service change.
+`exchange-demo` содержит зафиксированный Git history, правила, unittest suite и три намеренных дефекта с expected failures. Code RAG integration-тесты проверяют symbol/path/commit retrieval и incremental updates. `evals/coding_tasks.json` и три `.patch` файла задают deterministic M6 harness: CI применяет каждый patch к синтетической копии репозитория и выполняет реальные compileall/unittest в Docker. Это проверяет patch/test/review контур, но не качество генерации LLM. Набор из 20–30 coding-задач с исходным commit и независимыми acceptance tests планируется отдельно: bug fix, небольшая feature, refactoring, API compatibility, test repair и cross-service change.
 
 Eval-задачи нельзя использовать для fine-tuning.
 
@@ -43,12 +43,12 @@ Grounded path дополнительно проверяет существова
 
 - patch applies;
 - build pass;
-- hidden tests pass и pass@1;
+- прохождение независимых acceptance tests на первой попытке;
 - изменения существующих тестов;
 - число repair iterations;
 - доля принятых человеком diff.
 
-На M7 `copilot-coding-evaluation` сравнивает три режима на одном commit и наборе coding-задач: Base (полный ограниченный snapshot tracked Python-файлов из Git, без retrieval и repair), RAG (grounded code citations, без repair) и RAG + test loop (grounded citations, максимум две repair iterations). Все три режима получают исходный код: Base получает snapshot до 24 KiB суммарно, RAG — только выбранные commit-matched citations. `evals/coding_benchmark.json` содержит только task ID и instructions; loader отвергает дополнительные поля и runner не загружает prepared patch files. `patch_applied` и `patch_apply_rate` относятся к итоговому worktree diff после последней попытки, а не к промежуточной попытке, которую repair сбросил. Cleanup error сохраняется в результате задачи и не прерывает отчёт. Отчёт содержит SHA-256 canonical task set, base commit, configured model/endpoint, rates применения patch/build/test, число repairs, длительность, p50/p95 LLM request latency и tokens/sec, если endpoint возвращает usage. `pass_at_1` измеряется для Base/RAG; `success_after_repairs` отдельно отражает RAG + test loop. Human acceptance, VRAM и RAM автоматически не предполагаются и остаются ручными измерениями. Набор мал и синтетический, его результаты не доказывают качество на реальном коде.
+На M7 `copilot-coding-evaluation` сравнивает три режима на одном commit и наборе coding-задач: Base (ограниченный snapshot tracked Python-файлов из Git, без retrieval и repairs), RAG (grounded code citations, без repairs) и RAG + test loop (grounded citations, максимум две repair iterations). Все три режима получают исходный код: Base получает snapshot до 24 KiB суммарно, RAG — только выбранные commit-matched citations. `evals/coding_benchmark.json` содержит только task ID и instructions; loader отвергает дополнительные поля и runner не загружает prepared patch files. Сейчас набор содержит три синтетические задачи, поэтому benchmark пригоден как smoke-level baseline, но слишком мал для вывода о качестве или обобщении. `patch_applied` и `patch_apply_rate` относятся к итоговому worktree diff после последней попытки. Cleanup error сохраняется в результате задачи и не прерывает отчёт. Отчёт содержит SHA-256 canonical task set, base commit, configured model/endpoint, rates применения patch/build/test, число repairs, длительность, p50/p95 LLM request latency и tokens/sec, если endpoint возвращает usage. `single_attempt_verified_rate` для Base/RAG и `success_after_repairs_rate` для test loop отражают прохождение текущих compileall/unittest, а не независимых hidden acceptance tests. Human acceptance, VRAM и RAM остаются ручными измерениями.
 
 ### Fake HTTP integration simulation
 

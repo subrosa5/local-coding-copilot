@@ -14,13 +14,15 @@
 
 1. Локальные HTTP API и MCP для одного движка.
 2. Document RAG с hybrid retrieval, источниками и корректным отказом.
-3. Локальные LLM, embeddings и reranker через сменные provider interfaces.
+3. Сменные provider interfaces для LLM, embeddings и reranker. В текущем коде подключён OpenAI-compatible loopback LLM provider; embeddings пока fake, а reranker interface не подключён к retrieval path. Локальные embeddings и проверенный reranker остаются будущей работой.
 4. Пользователи, проектные ACL, rate limits и audit.
 5. Индексация синтетического Git-репозитория с AST-метаданными и commit SHA.
 6. Coding workflow: task → retrieve → plan → patch → test → review → diff.
 7. Git worktree и sandbox без сети и production-секретов.
 8. Воспроизводимый benchmark и сценарии для тестировщиков.
 9. Docker Compose и runbook для локального запуска.
+
+HTTP API и MCP в этом POC — локальные optional transports, не облачные AI API. HTTP server привязан к loopback; inference provider также обращается только к loopback endpoint. Coding workflow сейчас доступен через CLI. Если интерфейс продукта должен полностью обходиться без HTTP/MCP, эти transports не входят в финальную поверхность продукта и должны оставаться только тестовыми/разработческими адаптерами.
 
 ## Не входит в POC
 

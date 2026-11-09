@@ -1,5 +1,7 @@
+import math
 import os
 import subprocess
+import threading
 import time
 import uuid
 from collections.abc import Sequence
@@ -78,26 +80,56 @@ class DockerSandbox:
             config.image,
             *command,
         ]
+        effective_timeout = (
+            config.timeout_seconds if timeout_seconds is None else timeout_seconds
+        )
+        if (
+            isinstance(effective_timeout, bool)
+            or not isinstance(effective_timeout, (int, float))
+            or not math.isfinite(effective_timeout)
+            or effective_timeout <= 0
+        ):
+            raise ValueError("Sandbox timeout must be finite and positive")
         started = time.monotonic()
         process = subprocess.Popen(
             arguments,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
         )
+        stdout_tail = bytearray()
+        stderr_tail = bytearray()
+        readers = (
+            threading.Thread(
+                target=_drain_tail,
+                args=(process.stdout, stdout_tail),
+                daemon=True,
+            ),
+            threading.Thread(
+                target=_drain_tail,
+                args=(process.stderr, stderr_tail),
+                daemon=True,
+            ),
+        )
+        for reader in readers:
+            reader.start()
         timed_out = False
         try:
-            stdout, stderr = process.communicate(
-                timeout=timeout_seconds or config.timeout_seconds
-            )
+            process.wait(timeout=effective_timeout)
         except subprocess.TimeoutExpired:
             timed_out = True
-            subprocess.run(
-                ["docker", "rm", "--force", name],
-                capture_output=True,
-                text=True,
-            )
-            stdout, stderr = process.communicate()
+            try:
+                subprocess.run(
+                    ["docker", "rm", "--force", name],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                process.wait(timeout=10)
+            except (OSError, subprocess.SubprocessError):
+                process.kill()
+                process.wait()
+        for reader in readers:
+            reader.join()
         duration_ms = round((time.monotonic() - started) * 1000)
         return SandboxResult(
             stage=stage,
@@ -105,6 +137,13 @@ class DockerSandbox:
             exit_code=124 if timed_out else process.returncode,
             duration_ms=duration_ms,
             timed_out=timed_out,
-            stdout_tail=stdout[-_OUTPUT_TAIL:],
-            stderr_tail=stderr[-_OUTPUT_TAIL:],
+            stdout_tail=stdout_tail.decode("utf-8", errors="replace"),
+            stderr_tail=stderr_tail.decode("utf-8", errors="replace"),
         )
+
+
+def _drain_tail(stream, tail: bytearray) -> None:
+    while chunk := stream.read(8192):
+        tail.extend(chunk)
+        if len(tail) > _OUTPUT_TAIL:
+            del tail[: len(tail) - _OUTPUT_TAIL]
