@@ -78,7 +78,7 @@ ruff format --check .
 pytest
 ```
 
-Тесты используют fake/deterministic providers и не требуют внешних AI API. PostgreSQL/MCP integration-тесты требуют `DATABASE_URL` и выполняются в CI с pgvector.
+Тесты используют fake/deterministic providers и не требуют внешних AI API. Test-only scripted HTTP endpoint дополнительно проверяет сквозной путь provider → model patch → validation → worktree → sandbox → repair/audit; его mock diff не считается генерацией модели и не участвует в benchmark. Такая симуляция подтверждает интеграцию и защитный контур, но не качество генерации, производительность, GPU, offline или работу настоящей модели. Embeddings пока fake. PostgreSQL/MCP integration-тесты требуют `DATABASE_URL` и выполняются в CI с pgvector.
 
 ## Связанные репозитории
 

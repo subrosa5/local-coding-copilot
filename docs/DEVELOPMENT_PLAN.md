@@ -90,6 +90,7 @@
 - Реализовать сменный provider для OpenAI-compatible локального endpoint без привязки к inference server; fake HTTP server tests не обращаются к внешним AI API.
 - Подключить настроенную LLM к document/code RAG; embeddings пока остаются fake и должны быть отражены в итоговых выводах.
 - Подключить model-based patch generation к существующим `PatchProvider` и coding orchestration; валидировать tool calls по allowlist/schema и unified diff до `git apply`.
+- Проверять сквозной fake HTTP → model patch → worktree → sandbox → repair/audit путь только scripted test fixture; это integration simulation, не model generation benchmark и не hardware validation.
 - Запустить quantized coding model на RTX 4070 Ti: сначала 7B, затем сравнить с 14B при наличии VRAM.
 - Проверить initial patch и максимум две repair iterations на синтетических coding tasks.
 - Сравнить полный ограниченный source snapshot без RAG, LLM + grounded code RAG и LLM + RAG + test loop.

@@ -164,7 +164,7 @@ python -m local_coding_copilot.evaluation
 
 Evaluation сохраняет `data/runtime/m3-evaluation.json`, сравнивает baseline и grounded RAG на одном SHA-256 dataset и проверяет recall@5, correct refusal и false refusal rate. CI сохраняет отчёт как artifact для каждой версии Python.
 
-Без `DATABASE_URL` PostgreSQL/MCP integration-тесты пропускаются. В CI они выполняются с реальным pgvector на Python 3.11 и 3.13, включая cross-project ACL, HTTP, MCP, rate-limit и audit-сценарии. Внешние AI API не используются.
+Без `DATABASE_URL` PostgreSQL/MCP integration-тесты пропускаются. Без Docker daemon пропускаются sandbox integration-тесты. В CI эти проверки выполняются с реальными pgvector/Docker на Python 3.11 и 3.13, включая cross-project ACL, HTTP, MCP, rate-limit, audit и сквозной fake inference → model patch → sandbox сценарий. Scripted mock diff находится только в test fixtures, не загружается benchmark и не считается генерацией модели. Внешние AI API не используются; успешная симуляция не заменяет hardware/model validation на целевом ПК.
 
 ## Будущая локальная конфигурация
 
