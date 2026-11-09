@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import subprocess
 from dataclasses import asdict
 from math import ceil
 from pathlib import Path
@@ -150,7 +151,7 @@ def run_coding_benchmark(
                 try:
                     worktrees.remove(repository, Path(result.worktree))
                     cleanup_error = None
-                except (OSError, ValueError) as error:
+                except (OSError, ValueError, subprocess.SubprocessError) as error:
                     cleanup_error = type(error).__name__
                 task_results.append(
                     {

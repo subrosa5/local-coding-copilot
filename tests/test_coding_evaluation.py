@@ -156,3 +156,41 @@ def test_coding_benchmark_runs_three_configs_without_changing_source(
         == ""
     )
     assert list((tmp_path / "worktrees").iterdir()) == []
+
+
+def test_benchmark_records_called_process_error_during_cleanup(
+    exchange_repository: Path, tmp_path: Path
+) -> None:
+    commit = subprocess.run(
+        ["git", "-C", str(exchange_repository), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    worktrees = GitWorktreeManager(tmp_path / "worktrees")
+    remove_worktree = worktrees.remove
+
+    def remove_then_raise(repository: Path, worktree_path: Path) -> None:
+        remove_worktree(repository, worktree_path)
+        raise subprocess.CalledProcessError(1, ["git", "worktree", "remove"])
+
+    worktrees.remove = remove_then_raise
+    report = run_coding_benchmark(
+        exchange_repository,
+        (CodingTask("notional-boundary", "Fix boundary"),),
+        llm=StubLLM(),
+        code_service=StubCodeService(commit),
+        worktrees=worktrees,
+        sandbox=StubSandbox(),
+        audit=StubAudit(),
+        principal=Principal("admin", "admin", frozenset({"default"})),
+        project_id="default",
+    )
+
+    configs = report["configurations"]
+    assert len(configs) == 3
+    assert all(
+        item["results"][0]["worktree_cleanup_error"] == "CalledProcessError"
+        for item in configs
+    )
+    assert list((tmp_path / "worktrees").iterdir()) == []

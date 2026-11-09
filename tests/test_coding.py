@@ -269,6 +269,32 @@ def test_missing_patch_returns_failed_without_running_sandbox(
     assert sandbox.calls == []
 
 
+def test_patch_applied_reflects_final_worktree_after_unavailable_repair(
+    exchange_repository: Path, tmp_path: Path, admin_principal: Principal
+) -> None:
+    patch = StaticPatchProvider.from_file(TASKS_PATH).propose_patch(
+        CodingTask("notional-boundary", ""), 0, ()
+    )
+    audit = RecordingAudit()
+    result = make_orchestrator(
+        tmp_path,
+        FakeSandbox(test_exit_codes=[1]),
+        StaticPatchProvider({"notional-boundary": (patch,)}),
+        audit,
+    ).run(
+        exchange_repository,
+        CodingTask("notional-boundary", ""),
+        "default",
+        principal=admin_principal,
+    )
+
+    assert result.status == "failed"
+    assert result.diff == ""
+    assert result.changed_files == ()
+    assert result.patch_applied is False
+    assert audit.events[-1]["args"][-1]["patch_applied"] is False
+
+
 def test_invalid_patch_is_reported_to_bounded_repair_attempt(
     exchange_repository: Path, tmp_path: Path, admin_principal: Principal
 ) -> None:

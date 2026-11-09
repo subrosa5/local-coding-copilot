@@ -71,7 +71,6 @@ class CodingOrchestrator:
         previous_results = []
         build = None
         test = None
-        patch_applied = False
         message = "Patch did not pass verification"
 
         for attempt in range(self._max_repair_iterations + 1):
@@ -84,7 +83,6 @@ class CodingOrchestrator:
                     task, attempt, tuple(previous_results)
                 )
                 self._worktrees.apply_patch(worktree, patch)
-                patch_applied = True
             except PatchUnavailableError as error:
                 message = str(error)
                 break
@@ -124,7 +122,6 @@ class CodingOrchestrator:
                     principal,
                     project_id,
                     transport,
-                    patch_applied,
                 )
 
         return self._result(
@@ -138,7 +135,6 @@ class CodingOrchestrator:
             principal,
             project_id,
             transport,
-            patch_applied,
         )
 
     def _result(
@@ -153,10 +149,10 @@ class CodingOrchestrator:
         principal: Principal,
         project_id: str,
         transport: str,
-        patch_applied: bool,
     ) -> CodingTaskResult:
         diff = self._worktrees.diff(worktree)
         changed_files = self._worktrees.changed_files(worktree)
+        patch_applied = bool(diff and changed_files)
         diff_sha256 = hashlib.sha256(diff.encode()).hexdigest()
         tests_changed = any(
             path == "tests" or path.startswith("tests/") for path in changed_files
