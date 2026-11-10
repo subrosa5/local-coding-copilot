@@ -124,3 +124,24 @@ flowchart LR
 6. Отдельный security/architecture review принимает решение `go`, `conditional-go` или `no-go` для изолированного пилота.
 
 До этих gate система остаётся POC на синтетических данных. Доступ к production-коду, реальным секретам и критичным системам не является частью текущего проекта.
+
+## Как связаны репозитории
+
+В работе есть три разных GitHub-репозитория; у каждого отдельная роль:
+
+| Репозиторий | Роль | Нужен для запуска основного приложения? | Данные и доступ |
+|---|---|---:|---|
+| [`local-coding-copilot`](https://github.com/subrosa5/local-coding-copilot) | Основной проект: backend POC, document/code RAG, авторизация, coding orchestration, sandbox и оценки | Да — это само приложение | Код проекта и внутренние синтетические fixtures; сейчас private |
+| [`rag-mcp-agent`](https://github.com/subrosa5/rag-mcp-agent) | Отдельный RAG/MCP демонстрационный агент. В нём показывались hybrid retrieval, tool use и evaluation; оттуда берётся опыт и могут адаптироваться отдельные проверенные подходы | Нет — не запускается как часть local-coding-copilot и не вызывается им | Отдельный public demo repository; это не основная система для enterprise-контура |
+| [`exchange-demo`](https://github.com/subrosa5/exchange-demo) | Синтетическая биржевая codebase для индексации, проверки Python Code RAG и подготовки coding задач | Нет для обычного старта приложения; нужен для повторения текущих code/coding demo и benchmark | Искусственный код и тесты, не код биржи; сейчас private |
+
+Связь между проектами можно представить так:
+
+```mermaid
+flowchart LR
+  RAG[rag-mcp-agent<br/>демо и источник опыта] -. отдельные идеи<br/>адаптируются вручную .-> CORE[local-coding-copilot<br/>основной продукт]
+  EX[exchange-demo<br/>синтетический code fixture] -->|индексация и coding evaluation| CORE
+  SYN[data/synthetic/<br/>документы в основном repo] -->|document RAG demo| CORE
+```
+
+Стрелка от `rag-mcp-agent` означает перенос проверенных идей отдельными изменениями, а не runtime-вызов, Git submodule или автоматическое копирование всего проекта. Для закрытого продукта внешней зависимостью от него быть не должно. `exchange-demo` — тестовая codebase, которую индексирует приложение; это не библиотека и не production-репозиторий.
