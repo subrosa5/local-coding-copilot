@@ -131,9 +131,9 @@ flowchart LR
 
 | Репозиторий | Роль | Нужен для запуска основного приложения? | Данные и доступ |
 |---|---|---:|---|
-| [`local-coding-copilot`](https://github.com/subrosa5/local-coding-copilot) | Основной проект: backend POC, document/code RAG, авторизация, coding orchestration, sandbox и оценки | Да — это само приложение | Код проекта и внутренние синтетические fixtures; сейчас private |
+| [`local-coding-copilot`](https://github.com/subrosa5/local-coding-copilot) | Основной проект: backend POC, document/code RAG, авторизация, coding orchestration, sandbox и оценки | Да — это само приложение | Код проекта и синтетические fixtures; public |
 | [`rag-mcp-agent`](https://github.com/subrosa5/rag-mcp-agent) | Отдельный RAG/MCP демонстрационный агент. В нём показывались hybrid retrieval, tool use и evaluation; оттуда берётся опыт и могут адаптироваться отдельные проверенные подходы | Нет — не запускается как часть local-coding-copilot и не вызывается им | Отдельный public demo repository; это не основная система для enterprise-контура |
-| [`exchange-demo`](https://github.com/subrosa5/exchange-demo) | Синтетическая биржевая codebase для индексации, проверки Python Code RAG и подготовки coding задач | Нет для обычного старта приложения; нужен для повторения текущих code/coding demo и benchmark | Искусственный код и тесты, не код биржи; сейчас private |
+| [`exchange-demo`](https://github.com/subrosa5/exchange-demo) | Синтетическая биржевая codebase для индексации, проверки Python Code RAG и подготовки coding задач | Нет для обычного старта приложения; нужен для повторения текущих code/coding demo и benchmark | Искусственный код и тесты, не код биржи; public |
 
 Связь между проектами можно представить так:
 
