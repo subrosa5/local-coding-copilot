@@ -19,30 +19,82 @@
 
 ## Как должна выглядеть конечная система
 
+Ниже показана **целевая версия для закрытого enterprise-контура**: около 10 проектов и ориентир около 100 разработчиков. Это архитектурная цель, а не состав текущего POC и не обещание пропускной способности. Пользовательский путь не требует MCP или доступа к внешнему API. Клиентом предполагается корпоративное IDE-расширение или desktop-клиент; конкретный способ связи с внутренним сервисом выбирается при проектировании интеграции.
+
 ```mermaid
-flowchart LR
-  subgraph TRUSTED[Закрытая сеть компании — без внешних AI-сервисов]
-    DEV[Разработчик<br/>IDE или локальный клиент] --> EDGE[Внутренний Copilot service<br/>identity, project policy, quotas]
-    EDGE --> ORCH[Request orchestrator]
+flowchart TB
+  subgraph CLOSED[Закрытая сеть компании — без внешних AI-сервисов]
+    DEV[Разработчики<br/>IDE / локальный клиент<br/>проектный контекст]
 
-    ORCH --> RETR[Retrieval service<br/>ACL до выдачи контекста]
-    RETR --> DB[(PostgreSQL + pgvector<br/>документы, code chunks, ACL)]
-    RETR --> GIT[Разрешённые Git snapshots<br/>commit и project metadata]
-    ORCH --> MODEL[Внутренний inference pool<br/>coding LLM и embedding models]
+    subgraph CONTROL[Управляющий контур — доверенная бизнес-логика]
+      CLIENT[Внутренний клиентский вход<br/>аутентификация запроса]
+      IDP[Корпоративный SSO / identity<br/>группы и lifecycle доступа]
+      POLICY[Policy service<br/>project + repository ACL<br/>квоты и лимиты]
+      ORCH[Orchestrator<br/>план запроса, состояния,<br/>timeout и ограниченные retries]
+      VALIDATE[Проверки результата<br/>citations / diff / разрешённые действия]
+      CLIENT --> POLICY
+      IDP --> POLICY
+      POLICY --> ORCH
+    end
 
-    ORCH --> JOB[Задача на изменение]
-    JOB --> WT[Временный Git worktree]
-    WT --> RUNNER[Изолированный runner<br/>VM/gVisor/Kata, без сети/секретов]
-    RUNNER --> RESULT[Diff + результаты проверок]
-    RESULT --> REVIEW[Человеческий review<br/>обычный Git workflow]
+    DEV --> CLIENT
 
-    EDGE --> AUDIT[(Audit и operational metrics)]
-    ORCH --> AUDIT
-    RUNNER --> AUDIT
+    subgraph DATA[Контур данных и поиска]
+      SOURCES[Разрешённые Git-репозитории<br/>документы и версии commit]
+      INGEST[Контролируемая индексация<br/>проверка источника, разбор,<br/>секреты и метаданные]
+      EMB[Внутренняя embedding-модель<br/>векторизация при индексации<br/>и поиске]
+      STORE[(PostgreSQL + pgvector<br/>chunks, текстовый/векторный индекс,<br/>project ACL и commit metadata)]
+      RETR[Retrieval<br/>ACL в SQL до кандидатов<br/>hybrid search → RRF → optional reranker]
+      SOURCES --> INGEST --> EMB --> STORE
+      STORE --> RETR
+    end
+
+    subgraph INFERENCE[Контур локальных моделей]
+      QUEUE[Внутренняя очередь inference<br/>лимиты по проекту и приоритеты]
+      GPU[GPU inference pool<br/>coding LLM + embeddings<br/>закреплённые версии моделей]
+      REG[(Внутренний registry моделей<br/>проверенные файлы, hashes,<br/>версии и rollback)]
+      REG --> GPU
+      QUEUE --> GPU
+    end
+
+    subgraph EXEC[Контур выполнения кода — отдельная зона доверия]
+      JOB[Изолированная coding job<br/>только выбранный проект и base commit]
+      WT[Временный Git worktree<br/>исходный checkout read-only]
+      RUNNER[Одноразовый sandbox worker<br/>VM / Kata / gVisor<br/>без сети, секретов и host mounts]
+      CHECKS[Build, tests, linters<br/>лимиты времени и ресурсов]
+      DIFF[Diff + результаты + evidence]
+      JOB --> WT --> RUNNER --> CHECKS --> DIFF
+    end
+
+    REVIEW[Человеческий review<br/>защищённый Git workflow<br/>обычный CI и merge approvals]
+    AUDIT[(Audit и operational metrics<br/>доступы, latency, исходы,<br/>без prompts/secrets по умолчанию)]
+
+    ORCH -->|вопрос и разрешённые scopes| RETR
+    RETR -->|только разрешённые фрагменты| ORCH
+    ORCH -->|контекст и задача| QUEUE
+    GPU -->|ответ или unified diff| VALIDATE
+    VALIDATE -->|ответ с citations| CLIENT
+    VALIDATE -->|валидированный patch| JOB
+    DIFF --> REVIEW
+
+    POLICY -. минимальные audit-события .-> AUDIT
+    ORCH -. latency и outcome .-> AUDIT
+    RUNNER -. результаты проверок .-> AUDIT
   end
 ```
 
-На production-пилоте внутренний inference pool, БД и runners могут быть отдельными узлами. Конкретное число GPU, серверов и replicas нельзя выбирать по результатам одного домашнего ПК: сначала нужны измерения локального POC и нагрузочная модель.
+### Как читать схему
+
+- **Разработчик → внутренний клиент:** сотрудник задаёт вопрос или просит подготовить изменение из IDE/локального клиента. MCP и внешний AI API не являются пользовательским интерфейсом продукта.
+- **Identity → policy → orchestrator:** сервис устанавливает пользователя, проверяет доступ к проекту/репозиторию, применяет квоты и только затем запускает поиск или coding job. Модель не принимает решений о правах.
+- **Индексация:** документы и Git-версии поступают из разрешённых внутренних источников. Код разбирается, связывается с commit, индексируется локальной embedding-моделью и хранится с ACL. Индексация — отдельный контролируемый процесс, не действие модели.
+- **RAG:** retrieval применяет ACL в запросе к данным, находит текстовые и векторные кандидаты, объединяет их через RRF и при доказанной пользе использует reranker. В контекст модели попадают только разрешённые фрагменты выбранной версии.
+- **Inference:** coding LLM и embedding-модель обслуживаются внутренним GPU-пулом. Очереди, квоты, зафиксированные версии, hashes и rollback позволяют контролировать нагрузку и обновления. Модели не загружаются из интернета во время пользовательского запроса.
+- **Coding loop:** модель возвращает unified diff. Валидатор ограничивает пути и формат, отдельный worktree изолирует изменение, одноразовый worker запускает проверки. Ограниченное число repair-попыток может получить только безопасную обратную связь.
+- **Review:** человек получает diff, base commit и результаты проверок. Существующие защищённые Git-процессы выполняют approvals и merge; агент merge полномочий не имеет.
+- **Audit:** фиксируются нужные для расследования и эксплуатации метаданные. Полные prompts, ответы и секреты не записываются по умолчанию.
+
+На пилоте inference, БД, управляющие сервисы и runners размещаются раздельно по зонам доверия. Физические узлы, число GPU, replicas и способ оркестрации нельзя определить без измерений на целевых моделях и нагрузки. Это целевая схема для проектирования; текущий POC не реализует SSO, внутренний GPU-пул, registry, очереди или VM-grade sandbox.
 
 ## Компоненты и назначение
 
