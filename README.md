@@ -20,6 +20,16 @@
 
 В текущем POC есть локальные HTTP/MCP-адаптеры для document/code queries и loopback HTTP-соединение с inference server. Это внутренние интерфейсы, не облачные провайдеры. Coding workflow сейчас запускается через CLI. Целевой способ доступа разработчиков нужно выбрать отдельно.
 
+## Связанные репозитории
+
+| Репозиторий | Для чего нужен | Отношение к этому проекту |
+|---|---|---|
+| [`local-coding-copilot`](https://github.com/subrosa5/local-coding-copilot) | Основной POC локального coding assistant: RAG, project ACL, orchestration, patch validation, sandbox и evaluation | Здесь развивается целевой продукт. Сейчас репозиторий private. |
+| [`rag-mcp-agent`](https://github.com/subrosa5/rag-mcp-agent) | Отдельная демонстрация RAG/MCP: hybrid retrieval, tool use и evaluation | Источник опыта и отдельных архитектурных решений. Это отдельный проект, не сервисная или Git-зависимость local-coding-copilot. Репозиторий public. |
+| [`exchange-demo`](https://github.com/subrosa5/exchange-demo) | Синтетический Python-код биржи с тестами и известными дефектами | Внешний учебный fixture для Code RAG, coding loop и benchmark. Не содержит код реальной биржи и не является частью приложения. Репозиторий private. |
+
+Дополнительно, `data/synthetic/` внутри этого репозитория содержит демонстрационные документы для Document RAG. Внешние runtime-сервисы — PostgreSQL/pgvector и Docker; `rag-mcp-agent` и `exchange-demo` не являются устанавливаемыми Python-зависимостями.
+
 ## Документы
 
 1. [Обзор продукта, полный пайплайн и целевая enterprise-архитектура](docs/PRODUCT_OVERVIEW.md) — начать отсюда.
