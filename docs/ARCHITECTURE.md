@@ -1,107 +1,84 @@
-# Целевая архитектура
+# Техническая архитектура
 
-Документ описывает целевое устройство. Наличие компонента здесь не означает, что он уже реализован.
+Для общего описания продукта и сценариев сначала прочитайте [PRODUCT_OVERVIEW.md](PRODUCT_OVERVIEW.md). Здесь зафиксированы конкретные компоненты текущего POC, связи между ними и отличия от целевого развёртывания.
 
-## Схема
+## Архитектура текущего POC
 
-```text
-HTTP client / MCP client / IDE
-              │
-       API + Auth + Quotas
-              │
-        Coding Orchestrator
-        ┌─────┼─────────────┐
-        │     │             │
-   Retrieval  LLM       Git Workspace
-        │     │             │
- hybrid RAG   │        patch + diff
-        │     │             │
- PostgreSQL   │        Sandbox Runner
- pgvector     │        build/test/lint
-        │     │             │
- Git + docs + ACL      Audit + Metrics
+```mermaid
+flowchart LR
+  CLIENT[CLI / local HTTP / MCP] --> APP[Application bootstrap]
+  APP --> AUTH[Token auth + project membership]
+  APP --> RAG[DocumentRAGService]
+  RAG --> RET[Postgres retrieval repository]
+  RET --> PG[(PostgreSQL + pgvector)]
+  RAG --> EMB[FakeEmbeddingProvider]
+  RAG --> LLM[Fake LLM by default<br/>or configured loopback LLM]
+
+  CODECLI[Code RAG CLI] --> INDEX[GitCodeIndexer + Tree-sitter]
+  INDEX --> PG
+  CODING[Кодовый CLI] --> ORCH[CodingOrchestrator]
+  ORCH --> PATCH[ModelPatchProvider<br/>or StaticPatchProvider]
+  PATCH --> LLM
+  ORCH --> WT[Detached Git worktree]
+  WT --> DOCKER[DockerSandbox<br/>network=none]
+  DOCKER --> ORCH
+  ORCH --> HUMAN[Diff и отчёт для review]
+  APP --> AUDIT[(Технический audit)]
+  ORCH --> AUDIT
 ```
 
-## Компоненты
+На схеме опущены конкретные операции CLI, ошибки и метрики. Стрелка к модели не означает, что реальная модель уже проверена: без конфигурации используется fake LLM; embeddings остаются fake в любом режиме.
 
-### API и MCP
+## Компоненты кода
 
-FastAPI HTTP и MCP stdio вызывают один `Application` с общими `DocumentRAGService` и auth service. Они не содержат отдельных реализаций retrieval или orchestration. HTTP аутентифицирует Bearer token, MCP получает токен из окружения процесса. Права определяются по записи токена и project membership в PostgreSQL, а не по аргументам запроса. Это локальные optional transports, не облачные AI API; HTTP слушает loopback. Coding workflow сейчас доступен через CLI. Если конечная поверхность продукта должна обходиться без HTTP/MCP, эти адаптеры остаются только для разработки и не включаются в неё.
+| Зона | Реализация | Фактическая роль |
+|---|---|---|
+| Composition root | `src/local_coding_copilot/bootstrap.py` | Создаёт PostgreSQL repositories, auth, RAG services и providers |
+| Auth | `src/local_coding_copilot/auth.py` | Проверяет локальный token и загружает роли/project membership |
+| Document RAG | `src/local_coding_copilot/rag/` | Chunking, hybrid retrieval, context assembly, grounded response |
+| Code RAG | `src/local_coding_copilot/code/` | Читает Git blobs, извлекает Python symbols и сохраняет commit-aware chunks |
+| LLM providers | `src/local_coding_copilot/providers/` | Fake providers для CI и OpenAI-compatible loopback LLM client |
+| Coding loop | `src/local_coding_copilot/coding/` | Patch provider, validation, worktree, sandbox и bounded repairs |
+| Coding benchmark | `src/local_coding_copilot/coding_evaluation.py` | Сравнивает Base, RAG и RAG + test loop на текущих трёх задачах |
+| Interfaces | `api.py`, `mcp_server.py`, `*_cli.py` | Локальные query endpoints/adapters и CLI; готового IDE UI нет |
 
-### Provider interfaces
+## Document и code retrieval
 
-В `src/local_coding_copilot/providers/contracts.py` определены независимые контракты:
+1. `DocumentRAGService` получает question, project ID и authenticated principal.
+2. Rate limiter применяется до embeddings и поиска.
+3. PostgreSQL ограничивает кандидатов project membership в SQL, затем выполняет full-text и vector candidate search.
+4. Reciprocal Rank Fusion объединяет результаты. Code RAG дополнительно ищет точные path/symbol/content совпадения.
+5. В контекст модели передаются выбранные chunks. Для code citation содержит repository, path, symbol, строки и commit SHA.
+6. `grounded` проверяет, что citations существуют и числа в ответе встречаются в процитированных фрагментах. Проверка не доказывает смысловую поддержку полного текста.
 
-- `LLMProvider` — chat/tool-call responses; M7 реализует OpenAI-compatible loopback HTTP adapter. Tool calls сопоставляются с разрешёнными именами и поддерживаемым подмножеством JSON Schema (`type`, `enum`, `required`, `properties`, `additionalProperties`, `items`); неизвестные schema keywords отклоняются. Coding patch path запрещает tool calls и принимает только raw unified diff;
-- `EmbeddingProvider` — embeddings;
-- `RerankerProvider` — reranking;
-- fake implementations — детерминированные CI-тесты без внешних API.
+Code indexer работает с чистым checkout и зафиксированным Git tree. Сейчас он поддерживает Python, использует Tree-sitter и отклоняет tracked Python symlinks. Инкрементальный режим обновляет изменённые файлы и удаляет исчезнувшие chunks. Векторные embeddings пока fake, а reranker не подключён.
 
-POC не зависит от конкретного inference server и не обращается к облачным endpoint. Provider запрещает non-loopback URL, proxy и redirects. Fake provider остаётся стандартом CI и локального запуска без конфигурации.
+## Coding loop
 
-### Retrieval
+`CodingOrchestrator` получает task, контекст и base commit. `ModelPatchProvider` запрашивает у выбранного LLM raw unified diff. До применения patch проверяются структура и пути; затем Git выполняет `apply --check` в отдельном detached worktree. `DockerSandbox` запускает `compileall` и `unittest` для этого worktree. При ошибке модель может получить ограниченные выводы проверки; допускается не более двух repair iterations. Итоговый worktree сохраняется для review. Merge API нет.
 
-Document RAG использует PostgreSQL full-text и pgvector candidates, объединённые через Reciprocal Rank Fusion. SQL CTE `visible_chunks` ограничивает chunks membership пользователя и выбранным проектом до обоих candidate generators. Повторная индексация атомарно заменяет документ и его chunks. Внутренний document ID имеет namespace проекта, поэтому одинаковые пути разных проектов не перезаписывают друг друга. Ответ содержит `source:start_line-end_line@version`, project ID и retrieval trace со vector/lexical scores.
+Sandbox в POC использует одноразовый Docker container, `network=none`, non-root пользователя, read-only root, writable worktree, лимиты памяти/CPU/PID и timeout. stdout/stderr считываются потоково с сохранением ограниченного хвоста. Это сокращает риск исчерпания памяти хоста через output, но не делает Docker эквивалентом VM или гарантией против container escape.
 
-Code RAG индексирует только tracked Python-файлы чистого Git checkout. Tree-sitter извлекает классы, функции и методы с qualified symbol names и line ranges. PostgreSQL выполняет exact path/symbol/content search, full-text и pgvector retrieval с RRF; ACL действует до candidate generation. Citations содержат repository, path, symbol, lines и commit SHA. Incremental indexer сравнивает SHA-256 содержимого, заменяет только изменённые файлы, удаляет исчезнувшие и обновляет commit metadata без повторной векторизации неизменённых файлов. Reranker provider пока не подключён.
+## Целевая enterprise-система
 
-Текущая сборка подключает `FakeEmbeddingProvider` к обоим RAG-путям. Его векторы детерминированы, но не кодируют семантическую близость; качество vector retrieval не подтверждено. Индексатор читает regular blobs зафиксированного Git tree и отклоняет tracked Python symlinks, не dereference-ит их из файловой системы.
+Текущая программа — одноузловой POC. Для закрытого пилота компоненты нужно разделить по зонам доверия:
 
-Текущая document-запись содержит:
+1. **Вход пользователей:** корпоративный IDE/client и identity/SSO adapter.
+2. **Control plane:** API/IPC boundary, authorization, project policy, quotas, orchestrator, audit.
+3. **Data plane:** PostgreSQL/pgvector, версии документов, Git snapshots и локальные embedding/reranker models.
+4. **Inference plane:** внутренний пул LLM workers с очередью и лимитами на пользователя/проект.
+5. **Execution plane:** отдельные ephemeral VM/gVisor/Kata workers без сети и секретов для build/test.
+6. **Review plane:** diff возвращается человеку; approval/merge выполняется существующими защищёнными Git-процессами.
 
-```text
-project_id/document_id/source/version/chunk_id
-start_line/end_line/content/embedding
-```
+Публичный интернет не нужен для этих потоков. Внутреннее соединение с inference service — это сетевой протокол внутри закрытой инфраструктуры, а не внешняя AI API. Если команда принципиально не хочет service API/MCP, пользовательский доступ можно реализовать клиентским приложением или IDE extension; кодовые границы auth, retrieval и orchestration всё равно должны оставаться в доверенном backend, а не переноситься в prompt.
 
-Code chunks дополнительно содержат `repository/path/content_sha256/symbol/symbol_kind/commit_sha`; таблица `code_repositories` фиксирует последний полностью проиндексированный commit.
+Enterprise-компоненты на этом этапе — целевой план, а не наличие реализации: SSO, distributed quotas, очереди, GPU pool, multi-node HA, backup/restore, VM-grade sandbox, observability/alerting и масштабирование на 100 пользователей ещё не проверены.
 
-### Orchestrator
+## Хранение и журналирование
 
-Document query реализован без дополнительного agent framework.
+- **PostgreSQL/pgvector:** chunks, project metadata, tokens/membership, audit и состояние индексов.
+- **Git:** исходный код и неизменяемая ссылка на base commit.
+- **Локальное runtime-хранилище:** модели, временные worktrees и результаты benchmark; не коммитить в Git.
+- **Audit:** технические outcomes, идентификаторы, hashes и ограниченные метаданные. Полные prompts, ответы и секреты по умолчанию не сохраняются.
 
-Режимы:
-
-- `fast` — retrieval и один LLM-вызов без обязательной citation validation;
-- `grounded` — relevance filtering, обязательные существующие citations и проверка числовых утверждений по процитированному тексту;
-- `eval` — отдельный runner с фиксированным dataset, fake provider и сохранением результатов.
-
-Оба режима отказывают при отсутствии релевантных источников. Grounding-проверки не доказывают смысловую истинность каждого утверждения и не являются security boundary. LLM-judge используется только в отдельной calibration harness, не в production answer path.
-
-`CodingOrchestrator` доступен через CLI только admin с membership в проекте. Он делает первую попытку и не более двух repair iterations, получая unified diff через `PatchProvider`. `StaticPatchProvider` остаётся детерминированным M6 harness, а `ModelPatchProvider` для M7 просит локальную LLM вернуть только raw diff. Patch проходит структурную и path validation, затем `git apply --check` в detached worktree; бинарные изменения, mode changes, traversal, `.git`, symlink paths и add/delete/rename отклоняются. Tool calls отклоняются coding provider и не исполняются. После compileall и unittest результат `awaiting_review` содержит diff, SHA-256, changed files, признак изменения тестов и технические результаты проверок. Merge API отсутствует.
-
-### Git workspace и sandbox
-
-`GitWorktreeManager` требует чистый исходный checkout, создаёт detached worktree от зафиксированного commit и применяет patch через `git apply`. Исходный checkout не редактируется. Рабочие worktrees сохраняются для review и удаляются человеком отдельной командой.
-
-`DockerSandbox` монтирует только disposable worktree как `/workspace`. Контейнер получает `network=none`, read-only root, non-root UID/GID, `cap-drop=ALL`, `no-new-privileges`, 512 МБ RAM, 1 CPU, лимит 128 процессов и timeout. Host environment и Docker socket внутрь не передаются. При timeout runner принудительно удаляет только созданный им контейнер. Это POC-изоляция, а не замена отдельным CI-нодам или более сильному sandbox для недоверенного production-кода.
-
-### Хранение
-
-POC использует минимальное число хранилищ:
-
-- PostgreSQL/pgvector — chunks, ACL, eval metadata и состояние;
-- Git — исходный код и версии;
-- локальное файловое хранилище — модели и временные runtime-артефакты вне Git.
-
-### Наблюдаемость
-
-Сохраняются технические метаданные: пользователь, проект, модель, commit, tool calls, latency, tokens, hash diff и результаты тестов. Полные prompt/response по умолчанию отключены.
-
-## Потоки
-
-### Вопрос по проекту
-
-`authenticate → authorize → retrieve → rerank → generate → validate citations → respond`
-
-При недостатке доказательств система возвращает явный отказ.
-
-### Coding-задача
-
-`task → retrieve → plan → worktree → patch → build/test/lint → bounded repair → review → diff`
-
-Тесты выполняются в sandbox. Изменение существующих тестов отдельно отмечается при review.
-
-## Перенос прежнего проекта
-
-Из `rag-mcp-agent` можно поэтапно переносить проверенные решения hybrid retrieval, provider adapters, MCP transport и eval harness. Новая архитектура не требует Qdrant или LangGraph на старте.
+Подробные настройки sandbox и угроз перечислены в [SECURITY.md](SECURITY.md); фактические пробелы пилота — в [PRODUCTION_GAP.md](PRODUCTION_GAP.md).

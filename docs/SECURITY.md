@@ -9,7 +9,7 @@
 
 В POC запрещены реальные секреты, production-дампы, персональные данные и ключи биржи.
 
-**Текущее состояние M4:** HTTP использует Bearer token, MCP и CLI получают `COPILOT_API_TOKEN` из окружения. В БД сохраняется только SHA-256 от случайного токена. Project membership проверяется в application service и в SQL до vector/lexical retrieval. Ingestion доступен только admin. Эти контроли не делают POC production-ready: нет SSO, token expiration/revocation UI и distributed rate limiting. Сервис остаётся на loopback/stdio и только с синтетическими документами. Пароли в `compose.yaml` являются локальными тестовыми credentials, не production-секретами.
+**Текущее состояние POC:** HTTP использует Bearer token, MCP и CLI получают `COPILOT_API_TOKEN` из окружения. В БД сохраняется только SHA-256 от случайного токена. Project membership проверяется в application service и в SQL до vector/lexical retrieval. Ingestion доступен только admin. Это базовые локальные controls, не enterprise identity: нет SSO, token expiration/revocation UI и distributed rate limiting. Транспорты доступны локально; используются только синтетические документы. Пароли в `compose.yaml` являются тестовыми credentials, не production-секретами.
 
 ## Основные угрозы
 
